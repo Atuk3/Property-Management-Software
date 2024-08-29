@@ -8,7 +8,7 @@ import datetime
 from flask import Flask,render_template, request, jsonify,flash,url_for,redirect,session,make_response
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
-from wtforms import FileField,  StringField, PasswordField, SubmitField, SelectField, DateField, TextAreaField
+from wtforms import DecimalField,  StringField, PasswordField, SubmitField, SelectField, DateField, TextAreaField
 from flask_login import UserMixin,login_user,login_required,logout_user,current_user
 from werkzeug.utils import secure_filename
 from wtforms.validators import InputRequired, DataRequired, EqualTo, Length, ValidationError
@@ -16,7 +16,7 @@ from sqlalchemy.sql import func
 from flask_bcrypt import Bcrypt
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import login_user, login_required, logout_user, current_user,LoginManager
-
+from flask_migrate import Migrate
 
 # Initialize Flask application
 app=Flask(__name__)
@@ -32,6 +32,7 @@ db.init_app(app)
 bcrypt= Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
+migrate=Migrate(app,db)
 #----------------------------------------------------------------
 #Database Creation
 class User(db.Model, UserMixin):
@@ -49,6 +50,16 @@ class Reservation(db.Model):
     notes = db.Column(db.Text, nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     user = db.relationship('User', backref=db.backref('reservations', lazy=True))
+
+class Room(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    room_number = db.Column(db.String(50), unique=True, nullable=False)
+    room_type = db.Column(db.String(50), nullable=False)
+    status = db.Column(db.String(50), nullable=False)
+    price = db.Column(db.Numeric(10, 2), nullable=False)  # Numeric type for price
+
+    def __repr__(self):
+        return f'<Room {self.room_number}>'
 #----------------------------------------------------------------
 # FORM CREATION
 class RegistrationForm(FlaskForm):
@@ -80,6 +91,14 @@ class ReservationForm(FlaskForm):
     room_number = StringField('Room Number', validators=[DataRequired()])
     notes = TextAreaField('Notes')
     submit = SubmitField('Save Reservation')
+
+class RoomForm(FlaskForm):
+    room_number = StringField('Room Number', validators=[DataRequired(), Length(min=1, max=10)])
+    room_type = SelectField('Room Type', choices=[('Standard 1', 'Standard 1'), ('Standard 2', 'Standard 2'), ('Executive', 'Executive'), ('Executive Wing B', 'Executive Wing B'), ('Exclusive', 'Exclusive')], validators=[DataRequired()])
+    status = SelectField('Status', choices=[('Available', 'Available'), ('Occupied', 'Occupied'), ('Maintenance', 'Maintenance')], validators=[DataRequired()])
+    price = DecimalField('Price', validators=[DataRequired()])
+    submit = SubmitField('Save')
+
 # ----------------------------------------------------------------    
 # Define the homepage route
 @app.route('/', methods=['GET', 'POST'])
@@ -120,7 +139,10 @@ def login():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    
+     # Fetch data for the dashboard
+    # reservations = Reservation.query.filter_by(user_id=current_user.id).all()
+    # rooms = Room.query.all()  # Example: get all rooms
+    # revenue = calculate_revenue()  # Define a function to calculate revenue
     return render_template('dashboard.html', current_user=current_user)
 
 @app.route('/reservations', methods=['GET', 'POST'])
@@ -149,6 +171,63 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
+@app.route('/rooms', methods=['GET', 'POST'])
+@login_required
+def manage_rooms():
+    # Handle filtering
+    room_type = request.args.get('room_type', '')
+    status = request.args.get('status', '')
+    
+    query = Room.query
+    if room_type:
+        query = query.filter_by(room_type=room_type)
+    if status:
+        query = query.filter_by(status=status)
+    
+    rooms = query.all()
+    
+    return render_template('manage_rooms.html', rooms=rooms, room_type=room_type, status=status)
+
+@app.route('/rooms/add', methods=['GET', 'POST'])
+@login_required
+def add_room():
+    form = RoomForm()
+    if form.validate_on_submit():
+        room = Room(
+            room_number=form.room_number.data,
+            room_type=form.room_type.data,
+            status=form.status.data,
+            price=form.price.data
+        )
+        db.session.add(room)
+        db.session.commit()
+        flash('Room added successfully!', 'success')
+        return redirect(url_for('manage_rooms'))
+    return render_template('add_room.html', form=form)
+
+@app.route('/rooms/edit/<int:room_id>', methods=['GET', 'POST'])
+@login_required
+def edit_room(room_id):
+    room = Room.query.get_or_404(room_id)
+    form = RoomForm(obj=room)
+    if form.validate_on_submit():
+        room.room_number = form.room_number.data
+        room.room_type = form.room_type.data
+        room.status = form.status.data
+        room.price = form.price.data
+        db.session.commit()
+        flash('Room updated successfully!', 'success')
+        return redirect(url_for('manage_rooms'))
+    return render_template('edit_room.html', form=form, room=room)
+
+@app.route('/rooms/delete/<int:room_id>', methods=['POST'])
+@login_required
+def delete_room(room_id):
+    room = Room.query.get_or_404(room_id)
+    db.session.delete(room)
+    db.session.commit()
+    flash('Room deleted successfully!', 'success')
+    return redirect(url_for('manage_rooms'))
 
 
 if __name__ == '__main__':
