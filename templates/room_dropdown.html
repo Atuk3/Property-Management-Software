@@ -1,0 +1,3 @@
+{% for room in rooms %}
+    <option value="{{ room.id }}">{{ room.id }} - ₦{{ room.price_per_night }}</option>
+{% endfor %}

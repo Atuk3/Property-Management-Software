@@ -3,15 +3,14 @@ import json
 import os
 import io
 import psycopg2
-import datetime
-
+from datetime import datetime
 from flask import Flask,render_template, request, jsonify,flash,url_for,redirect,session,make_response
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
 from wtforms import DecimalField,  StringField, PasswordField, SubmitField, SelectField, DateField, TextAreaField
 from flask_login import UserMixin,login_user,login_required,logout_user,current_user
 from werkzeug.utils import secure_filename
-from wtforms.validators import InputRequired, DataRequired, EqualTo, Length, ValidationError
+from wtforms.validators import InputRequired, DataRequired, EqualTo, Length, ValidationError, NumberRange
 from sqlalchemy.sql import func
 from flask_bcrypt import Bcrypt
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -60,6 +59,30 @@ class Room(db.Model):
 
     def __repr__(self):
         return f'<Room {self.room_number}>'
+    
+class Booking(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    guest_name = db.Column(db.String(100), nullable=False)
+    room_id = db.Column(db.Integer, db.ForeignKey('room.id'), nullable=False)
+   
+    check_in_date = db.Column(db.Date, nullable=False)
+    check_out_date = db.Column(db.Date, nullable=False)
+    status = db.Column(db.String(20), nullable=False, default='Pending')
+    total_amount = db.Column(db.Float, nullable=False)
+
+    room = db.relationship('Room', backref='bookings')
+
+
+    
+class Guest(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(100), unique=True, nullable=False)
+    phone_number = db.Column(db.String(20), unique=True, nullable=False)
+    # bookings = db.relationship('Booking', backref='guest', lazy=True)
+
+    def __repr__(self):
+        return f"<Guest {self.name}>"
 #----------------------------------------------------------------
 # FORM CREATION
 class RegistrationForm(FlaskForm):
@@ -99,6 +122,36 @@ class RoomForm(FlaskForm):
     price = DecimalField('Price', validators=[DataRequired()])
     submit = SubmitField('Save')
 
+class BookingForm(FlaskForm):
+    guest_name = StringField('Guest Name', validators=[DataRequired()])
+    
+    room_id = SelectField('Room', coerce=int, validators=[DataRequired()])
+    
+    check_in_date = DateField('Check-in Date', format='%Y-%m-%d', validators=[DataRequired()])
+    check_out_date = DateField('Check-out Date', format='%Y-%m-%d', validators=[DataRequired()])
+    
+    status = SelectField('Status', choices=[('Pending', 'Pending'), ('Confirmed', 'Confirmed'), ('Cancelled', 'Cancelled')], validators=[DataRequired()])
+    
+    total_amount = DecimalField('Total Amount (₦)', places=2, validators=[DataRequired(), NumberRange(min=0)], render_kw={'readonly': True})
+    
+    submit = SubmitField('Submit')
+
+    def __init__(self, *args, **kwargs):
+        super(BookingForm, self).__init__(*args, **kwargs)
+        self.room_id.choices = [(room.id, f'Room {room.room_number} ({room.room_type}) - ₦{room.price}') for room in Room.query.all()]
+
+    def calculate_total_price(self):
+        # Calculate number of nights
+        nights = (self.check_out_date.data - self.check_in_date.data).days
+        if nights <= 0:
+            nights = 1  # Minimum of one night
+
+        # Fetch room details
+        room = Room.query.get(self.room_id.data)
+        if room:
+            # Calculate total price
+            return room.price * nights
+        return 0
 # ----------------------------------------------------------------    
 # Define the homepage route
 @app.route('/', methods=['GET', 'POST'])
@@ -140,14 +193,15 @@ def login():
 @login_required
 def dashboard():
      # Fetch data for the dashboard
-    # reservations = Reservation.query.filter_by(user_id=current_user.id).all()
-    # rooms = Room.query.all()  # Example: get all rooms
+    # booking = Booking.query.filter_by(user_id=current_user.id).all()
+    rooms = Room.query.all()  # Example: get all rooms
     # revenue = calculate_revenue()  # Define a function to calculate revenue
-    return render_template('dashboard.html', current_user=current_user)
+    return render_template('dashboard.html', current_user=current_user, rooms=rooms)
 
 @app.route('/reservations', methods=['GET', 'POST'])
 @login_required
 def reservations():
+    
     form = ReservationForm()
     if form.validate_on_submit():
         new_reservation = Reservation(
@@ -162,9 +216,10 @@ def reservations():
         db.session.commit()
         print('Reservation created successfully!')
         return redirect(url_for('reservations'))
-    
+
     reservations = Reservation.query.all()
     return render_template('reservations.html', form=form, reservations=reservations)
+
 @app.route('/logout')
 @login_required
 def logout():
@@ -229,6 +284,81 @@ def delete_room(room_id):
     flash('Room deleted successfully!', 'success')
     return redirect(url_for('manage_rooms'))
 
+@app.route('/bookings', methods=['GET'])
+def manage_bookings():
+    status = request.args.get('status')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+
+    bookings = Booking.query
+
+    if status:
+        bookings = bookings.filter_by(status=status)
+
+    if start_date and end_date:
+        bookings = bookings.filter(Booking.check_in_date >= start_date, Booking.check_out_date <= end_date)
+
+    bookings = bookings.all()
+
+    return render_template('manage_bookings.html', bookings=bookings, status=status, start_date=start_date, end_date=end_date)
+
+@app.route('/bookings/add', methods=['GET', 'POST'])
+def add_booking():
+    form = BookingForm()
+    if form.validate_on_submit():
+        new_booking = Booking(
+            guest_name=form.guest_name.data,
+            room_id=form.room_id.data,
+            check_in_date=form.check_in_date.data,
+            check_out_date=form.check_out_date.data,
+            status=form.status.data,
+            total_amount=form.total_amount.data
+        )
+        db.session.add(new_booking)
+        db.session.commit()
+        flash('Booking added successfully!', 'success')
+        return redirect(url_for('manage_bookings'))
+    return render_template('add_booking.html', form=form)
+
+@app.route('/bookings/edit/<int:booking_id>', methods=['GET', 'POST'])
+def edit_booking(booking_id):
+    booking = Booking.query.get_or_404(booking_id)
+    form = BookingForm(obj=booking)
+    if form.validate_on_submit():
+        booking.guest_name = form.guest_name.data
+        booking.room_id = form.room_id.data
+        booking.check_in_date = form.check_in_date.data
+        booking.check_out_date = form.check_out_date.data
+        booking.status = form.status.data
+        booking.total_amount = form.total_amount.data
+        db.session.commit()
+        flash('Booking updated successfully!', 'success')
+        return redirect(url_for('manage_bookings'))
+    return render_template('edit_booking.html', form=form)
+
+@app.route('/bookings/delete/<int:booking_id>', methods=['POST'])
+def delete_booking(booking_id):
+    booking = Booking.query.get_or_404(booking_id)
+    db.session.delete(booking)
+    db.session.commit()
+    flash('Booking deleted successfully!', 'danger')
+    return redirect(url_for('manage_bookings'))
+
+@app.route('/guests', methods=['GET'])
+def manage_guests():
+    search_query = request.args.get('search', '')
+    guests = Guest.query.filter(
+        (Guest.name.ilike(f"%{search_query}%")) |
+        (Guest.email.ilike(f"%{search_query}%")) |
+        (Guest.phone_number.ilike(f"%{search_query}%"))
+    ).all()
+    return render_template('manage_guests.html', guests=guests, search_query=search_query)
+
+@app.route('/guests/<int:guest_id>', methods=['GET'])
+def view_guest_profile(guest_id):
+    guest = Guest.query.get_or_404(guest_id)
+    bookings = Booking.query.filter_by(guest_id=guest.id).all()
+    return render_template('view_guest_profile.html', guest=guest, bookings=bookings)
 
 if __name__ == '__main__':
     with app.app_context():
