@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Add Booking</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/css/dashboard.css" />
     <style>
         .container {
             max-width: 600px;
@@ -16,17 +17,51 @@
     </style>
 </head>
 <body>
+     <!-- Sidebar Navigation -->
+     <div class="sidebar">
+        <h2>Planet G Hotel & Suites</h2>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/reservations">Reservations</a>
+        <a href="/bookings">Check In</a>
+        <a href="/rooms">Manage Rooms</a>
+        <a href="#reports">Reports</a>
+        <a href="#/reservation">Settings</a>
+        <a href="/logout">Logout</a>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="content">
     <div class="container">
         <h1 class="mb-4">Add Booking</h1>
         <form method="POST" action="{{ url_for('add_booking') }}">
             {{ form.hidden_tag() }}
             <div class="form-group">
-                {{ form.guest_name.label(class="form-label") }}
-                {{ form.guest_name(class="form-control") }}
+                {{ form.first_name.label(class="form-label") }}
+                {{ form.first_name(class="form-control") }}
             </div>
             <div class="form-group">
-                {{ form.room_id.label(class="form-label") }}
-                {{ form.room_id(class="form-control") }}
+                {{ form.last_name.label(class="form-label") }}
+                {{ form.last_name(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ form.phone_number.label(class="form-label") }}
+                {{ form.phone_number(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ form.email.label(class="form-label") }}
+                {{ form.email(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ form.address.label(class="form-label") }}
+                {{ form.address(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ form.id_type.label(class="form-label") }}
+                {{ form.id_type(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ form.id_number.label(class="form-label") }}
+                {{ form.id_number(class="form-control") }}
             </div>
             <div class="form-group">
                 {{ form.check_in_date.label(class="form-label") }}
@@ -37,8 +72,8 @@
                 {{ form.check_out_date(class="form-control") }}
             </div>
             <div class="form-group">
-                {{ form.status.label(class="form-label") }}
-                {{ form.status(class="form-control") }}
+                {{ form.room_id.label(class="form-label") }}
+                {{ form.room_id(class="form-control") }}
             </div>
             <div class="form-group">
                 {{ form.total_amount.label(class="form-label") }}
@@ -48,6 +83,7 @@
                 {{ form.submit(class="btn btn-primary btn-block") }}
             </div>
         </form>
+    </div>
     </div>
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.1/dist/umd/popper.min.js"></script>

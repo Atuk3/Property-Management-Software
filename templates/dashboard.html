@@ -14,9 +14,8 @@
         <h2>Planet G Hotel & Suites</h2>
         <a href="/dashboard">Dashboard</a>
         <a href="/reservations">Reservations</a>
-        <a href="/guests">Guests</a>
+        <a href="/bookings">Check In</a>
         <a href="/rooms">Manage Rooms</a>
-        <a href="/bookings">Bookings</a>
         <a href="#reports">Reports</a>
         <a href="#/reservation">Settings</a>
         <a href="/logout">Logout</a>
@@ -49,11 +48,11 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for reservation in reservations %}
+                    {% for booking in bookings %}
                     <tr>
-                        <td>{{ reservation.id }}</td>
+                        <td>{{ booking.id }}</td>
                         <td>{{ reservation.guest_name }}</td>
-                        <td>{{ reservation.room_number }}</td>
+                        <td>{{ booking.room_number }}</td>
                         <td>{{ reservation.check_in_date }}</td>
                         <td>{{ reservation.check_out_date }}</td>
                     </tr>

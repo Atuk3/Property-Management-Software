@@ -57,21 +57,46 @@ class Room(db.Model):
     status = db.Column(db.String(50), nullable=False)
     price = db.Column(db.Numeric(10, 2), nullable=False)  # Numeric type for price
 
+    # This defines a relationship to Booking and sets the backref as 'room' in Booking.
+    bookings = db.relationship('Booking', backref='room', lazy=True)
+
     def __repr__(self):
-        return f'<Room {self.room_number}>'
+        return f"<Room {self.room_number}, Type {self.room_type}>"
     
 class Booking(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    guest_name = db.Column(db.String(100), nullable=False)
-    room_id = db.Column(db.Integer, db.ForeignKey('room.id'), nullable=False)
-   
+    first_name = db.Column(db.String(100), nullable=False)
+    last_name = db.Column(db.String(100), nullable=False)
+    phone_number = db.Column(db.String(20), nullable=False)
+    email = db.Column(db.String(120), nullable=False)
+    address = db.Column(db.String(200), nullable=False)
+    id_type = db.Column(db.String(50), nullable=False)
+    id_number = db.Column(db.String(50), nullable=False)
     check_in_date = db.Column(db.Date, nullable=False)
     check_out_date = db.Column(db.Date, nullable=False)
-    status = db.Column(db.String(20), nullable=False, default='Pending')
+    room_id = db.Column(db.Integer, db.ForeignKey('room.id'), nullable=False)
     total_amount = db.Column(db.Float, nullable=False)
 
-    room = db.relationship('Room', backref='bookings')
+    
 
+    def calculate_total_amount(self):
+        # Assuming Room model has a price attribute
+        room = Room.query.get(self.room_id)
+        num_nights = (self.check_out_date - self.check_in_date).days
+        return room.price * num_nights
+
+    def __init__(self, first_name, last_name, phone_number, email, address, id_type, id_number, check_in_date, check_out_date, room_id, total_amount):
+        self.first_name = first_name
+        self.last_name = last_name
+        self.phone_number = phone_number
+        self.email = email
+        self.address = address
+        self.id_type = id_type
+        self.id_number = id_number
+        self.check_in_date = check_in_date
+        self.check_out_date = check_out_date
+        self.room_id = room_id
+        self.total_amount = self.calculate_total_amount()
 
     
 class Guest(db.Model):
@@ -123,22 +148,24 @@ class RoomForm(FlaskForm):
     submit = SubmitField('Save')
 
 class BookingForm(FlaskForm):
-    guest_name = StringField('Guest Name', validators=[DataRequired()])
-    
+    first_name = StringField('First Name', validators=[DataRequired()])
+    last_name = StringField('Last Name', validators=[DataRequired()])
     room_id = SelectField('Room', coerce=int, validators=[DataRequired()])
-    
+    phone_number = StringField('Phone Number', validators=[DataRequired()])
+    email = StringField('Email', validators=[DataRequired()])
+    address = StringField('Address', validators=[DataRequired()])
+    id_type = SelectField('ID Type', choices=[('nin', 'NIN'), ('drivers_license', 'Driver\'s License'), ('id_card', 'ID Card')], validators=[DataRequired()])
+    id_number = StringField('ID Number', validators=[DataRequired()])
     check_in_date = DateField('Check-in Date', format='%Y-%m-%d', validators=[DataRequired()])
     check_out_date = DateField('Check-out Date', format='%Y-%m-%d', validators=[DataRequired()])
-    
-    status = SelectField('Status', choices=[('Pending', 'Pending'), ('Confirmed', 'Confirmed'), ('Cancelled', 'Cancelled')], validators=[DataRequired()])
-    
     total_amount = DecimalField('Total Amount (₦)', places=2, validators=[DataRequired(), NumberRange(min=0)], render_kw={'readonly': True})
     
     submit = SubmitField('Submit')
 
     def __init__(self, *args, **kwargs):
         super(BookingForm, self).__init__(*args, **kwargs)
-        self.room_id.choices = [(room.id, f'Room {room.room_number} ({room.room_type}) - ₦{room.price}') for room in Room.query.all()]
+        available_rooms = Room.query.filter_by(status='Available').all()
+        self.room_id.choices = [(room.id, f'Room {room.room_number} ({room.room_type}) - ₦{room.price}') for room in available_rooms]
 
     def calculate_total_price(self):
         # Calculate number of nights
@@ -193,7 +220,7 @@ def login():
 @login_required
 def dashboard():
      # Fetch data for the dashboard
-    # booking = Booking.query.filter_by(user_id=current_user.id).all()
+    # booking = Booking.query.all()
     rooms = Room.query.all()  # Example: get all rooms
     # revenue = calculate_revenue()  # Define a function to calculate revenue
     return render_template('dashboard.html', current_user=current_user, rooms=rooms)
@@ -286,34 +313,50 @@ def delete_room(room_id):
 
 @app.route('/bookings', methods=['GET'])
 def manage_bookings():
-    status = request.args.get('status')
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
+    phone_number = request.args.get('phone_number')
+    last_name = request.args.get('last_name')
 
     bookings = Booking.query
 
-    if status:
-        bookings = bookings.filter_by(status=status)
-
+    
     if start_date and end_date:
         bookings = bookings.filter(Booking.check_in_date >= start_date, Booking.check_out_date <= end_date)
 
+    if phone_number:
+        bookings = bookings.filter(Booking.phone_number.like(f'%{phone_number}%'))
+
+    if last_name:
+        bookings = bookings.filter(Booking.last_name.like(f'%{last_name}%'))
+
     bookings = bookings.all()
 
-    return render_template('manage_bookings.html', bookings=bookings, status=status, start_date=start_date, end_date=end_date)
+
+    return render_template('manage_bookings.html', bookings=bookings, start_date=start_date, end_date=end_date)
 
 @app.route('/bookings/add', methods=['GET', 'POST'])
 def add_booking():
     form = BookingForm()
     if form.validate_on_submit():
         new_booking = Booking(
-            guest_name=form.guest_name.data,
+            first_name=form.first_name.data,
+            last_name=form.last_name.data,
+            phone_number=form.phone_number.data,
+            email=form.email.data,
+            address=form.address.data,
+            id_type=form.id_type.data,
+            id_number=form.id_number.data,
             room_id=form.room_id.data,
             check_in_date=form.check_in_date.data,
             check_out_date=form.check_out_date.data,
-            status=form.status.data,
             total_amount=form.total_amount.data
         )
+
+        room = Room.query.get(form.room_id.data)
+        if room:
+            room.status = 'Occupied'  # Update room status to 'occupied'
+
         db.session.add(new_booking)
         db.session.commit()
         flash('Booking added successfully!', 'success')
@@ -325,16 +368,31 @@ def edit_booking(booking_id):
     booking = Booking.query.get_or_404(booking_id)
     form = BookingForm(obj=booking)
     if form.validate_on_submit():
-        booking.guest_name = form.guest_name.data
+         # Recalculate the total amount based on updated check-in and check-out dates
+        nights = (form.check_out_date.data - form.check_in_date.data).days
+        if nights <= 0:
+            nights = 1  # Minimum of one night
+        
+        room = Room.query.get(form.room_id.data)
+        total_amount = room.price * nights if room else 0
+
+        # Update the booking instance
+        booking.first_name = form.first_name.data
+        booking.last_name = form.last_name.data
+        booking.phone_number = form.phone_number.data
+        booking.email = form.email.data
+        booking.address = form.address.data
         booking.room_id = form.room_id.data
         booking.check_in_date = form.check_in_date.data
         booking.check_out_date = form.check_out_date.data
-        booking.status = form.status.data
-        booking.total_amount = form.total_amount.data
+        booking.id_type = form.id_type.data
+        booking.id_number = form.id_number.data
+        booking.total_amount = total_amount
         db.session.commit()
         flash('Booking updated successfully!', 'success')
         return redirect(url_for('manage_bookings'))
-    return render_template('edit_booking.html', form=form)
+        
+    return render_template('edit_booking.html', form=form, booking=booking)
 
 @app.route('/bookings/delete/<int:booking_id>', methods=['POST'])
 def delete_booking(booking_id):

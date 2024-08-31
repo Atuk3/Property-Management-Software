@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manage Bookings</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/css/dashboard.css" />
     <style>
         .container {
             max-width: 1200px;
@@ -19,20 +20,26 @@
     </style>
 </head>
 <body>
+     <!-- Sidebar Navigation -->
+     <div class="sidebar">
+        <h2>Planet G Hotel & Suites</h2>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/reservations">Reservations</a>
+        <a href="/bookings">Check In</a>
+        <a href="/rooms">Manage Rooms</a>
+        <a href="#reports">Reports</a>
+        <a href="#/reservation">Settings</a>
+        <a href="/logout">Logout</a>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="content">
     <div class="container">
         <h1 class="mb-4">Manage Bookings</h1>
         
         <form method="GET" action="{{ url_for('manage_bookings') }}" class="mb-4">
             <div class="form-row">
-                <div class="form-group col-md-4">
-                    <label for="status">Booking Status:</label>
-                    <select name="status" id="status" class="form-control">
-                        <option value="">All</option>
-                        <option value="Pending" {% if status == 'Pending' %}selected{% endif %}>Pending</option>
-                        <option value="Confirmed" {% if status == 'Confirmed' %}selected{% endif %}>Confirmed</option>
-                        <option value="Cancelled" {% if status == 'Cancelled' %}selected{% endif %}>Cancelled</option>
-                    </select>
-                </div>
+            
                 <div class="form-group col-md-4">
                     <label for="start_date">Check-in Date:</label>
                     <input type="date" name="start_date" id="start_date" class="form-control" value="{{ start_date }}">
@@ -40,6 +47,14 @@
                 <div class="form-group col-md-4">
                     <label for="end_date">Check-out Date:</label>
                     <input type="date" name="end_date" id="end_date" class="form-control" value="{{ end_date }}">
+                </div>
+                 <div class="form-group col-md-3">
+                    <label for="phone_number">Phone Number:</label>
+                    <input type="text" name="phone_number" id="phone_number" class="form-control" value="{{ phone_number }}">
+                </div>
+                <div class="form-group col-md-3">
+                    <label for="last_name">Last Name:</label>
+                    <input type="text" name="last_name" id="last_name" class="form-control" value="{{ last_name }}">
                 </div>
             </div>
             <div class="form-group d-flex justify-content-end">
@@ -53,11 +68,12 @@
             <thead class="thead-dark">
                 <tr>
                     <th>Booking ID</th>
-                    <th>Guest Name</th>
+                    <th>First Name</th>
+                    <th>Last Name</th>
+                    <th>Phone Number</th>
                     <th>Room Number</th>
                     <th>Check-in Date</th>
                     <th>Check-out Date</th>
-                    <th>Status</th>
                     <th>Total Amount (₦)</th>
                     <th>Actions</th>
                 </tr>
@@ -66,11 +82,12 @@
                 {% for booking in bookings %}
                 <tr>
                     <td>{{ booking.id }}</td>
-                    <td>{{ booking.guest_name }}</td>
+                    <td>{{ booking.first_name }}</td>
+                    <td>{{ booking.last_name }}</td>
+                    <td>{{ booking.phone_number }}</td>
                     <td>{{ booking.room.room_number }}</td>
                     <td>{{ booking.check_in_date }}</td>
                     <td>{{ booking.check_out_date }}</td>
-                    <td>{{ booking.status }}</td>
                     <td>₦{{ booking.total_amount }}</td>
                     <td>
                         <a href="{{ url_for('edit_booking', booking_id=booking.id) }}" class="btn btn-warning btn-sm">Edit</a>
@@ -82,6 +99,7 @@
                 {% endfor %}
             </tbody>
         </table>
+    </div>
     </div>
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.1/dist/umd/popper.min.js"></script>
