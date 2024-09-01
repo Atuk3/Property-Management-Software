@@ -78,9 +78,10 @@ class Booking(db.Model):
     adults_number = db.Column(db.Integer, nullable=False)
     status = db.Column(db.String(20), nullable=False, default='Pending')
     room_id = db.Column(db.Integer, db.ForeignKey('room.id'), nullable=False)
+    guest_id = db.Column(db.Integer, db.ForeignKey('guest.id'), nullable=False)  # ForeignKey for Guest
     total_amount = db.Column(db.Float, nullable=False)
 
-    
+     
 
     def calculate_total_amount(self):
         # Assuming Room model has a price attribute
@@ -88,7 +89,7 @@ class Booking(db.Model):
         num_nights = (self.check_out_date - self.check_in_date).days
         return room.price * num_nights
 
-    def __init__(self, first_name, last_name, phone_number, email, address, id_type, id_number, check_in_date, check_out_date, room_id, total_amount,children_number,adults_number,status):
+    def __init__(self, first_name, last_name, phone_number, email, address, id_type, id_number, check_in_date, check_out_date, room_id,guest_id, total_amount,children_number,adults_number,status):
         self.first_name = first_name
         self.last_name = last_name
         self.phone_number = phone_number
@@ -99,21 +100,25 @@ class Booking(db.Model):
         self.check_in_date = check_in_date
         self.check_out_date = check_out_date
         self.room_id = room_id
+        self.guest_id = guest_id 
         self.children_number = children_number
         self.adults_number = adults_number
         self.status = status
         self.total_amount = self.calculate_total_amount()
-
+   
     
 class Guest(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    email = db.Column(db.String(100), unique=True, nullable=False)
-    phone_number = db.Column(db.String(20), unique=True, nullable=False)
-    # bookings = db.relationship('Booking', backref='guest', lazy=True)
+    first_name = db.Column(db.String(100), nullable=False)
+    last_name = db.Column(db.String(100), nullable=False)
+    phone_number = db.Column(db.String(20), nullable=False)
+    email = db.Column(db.String(120), nullable=False, unique=True)
+    address = db.Column(db.String(200), nullable=False)
+    id_type = db.Column(db.String(50), nullable=False)
+    id_number = db.Column(db.String(50), nullable=False)
 
-    def __repr__(self):
-        return f"<Guest {self.name}>"
+    # Relationship to Booking
+    bookings = db.relationship('Booking', backref='guest', lazy=True)
 #----------------------------------------------------------------
 # FORM CREATION
 class RegistrationForm(FlaskForm):
@@ -346,7 +351,36 @@ def manage_bookings():
 def add_booking():
     form = BookingForm()
     if form.validate_on_submit():
+         # Check if the guest already exists based on email or other identifier
+        guest = Guest.query.filter_by(email=form.email.data).first()
+        
+        if guest is None:
+            # Create a new guest
+            guest = Guest(
+                first_name=form.first_name.data,
+                last_name=form.last_name.data,
+                phone_number=form.phone_number.data,
+                email=form.email.data,
+                address=form.address.data,
+                id_type=form.id_type.data,
+                id_number=form.id_number.data
+            )
+            db.session.add(guest)
+            db.session.commit()
+        else:
+            # Update existing guest details
+            guest.first_name = form.first_name.data
+            guest.last_name = form.last_name.data
+            guest.phone_number = form.phone_number.data
+            guest.address = form.address.data
+            guest.id_type = form.id_type.data
+            guest.id_number = form.id_number.data
+            db.session.commit()
+
+
+        # Create the booking
         new_booking = Booking(
+             guest_id=guest.id,  # Link the guest to the booking
             first_name=form.first_name.data,
             last_name=form.last_name.data,
             phone_number=form.phone_number.data,
@@ -442,12 +476,16 @@ def booking_history():
 
 @app.route('/guests', methods=['GET'])
 def manage_guests():
-    search_query = request.args.get('search', '')
-    guests = Guest.query.filter(
-        (Guest.name.ilike(f"%{search_query}%")) |
-        (Guest.email.ilike(f"%{search_query}%")) |
-        (Guest.phone_number.ilike(f"%{search_query}%"))
-    ).all()
+    search_query = request.args.get('search', '').strip()
+    if search_query:
+        guests = Guest.query.filter(
+            (Guest.first_name.ilike(f"%{search_query}%")) |
+            (Guest.last_name.ilike(f"%{search_query}%")) |
+            (Guest.email.ilike(f"%{search_query}%")) |
+            (Guest.phone_number.ilike(f"%{search_query}%"))
+        ).all()
+    else:
+        guests = Guest.query.all()
     return render_template('manage_guests.html', guests=guests, search_query=search_query)
 
 @app.route('/guests/<int:guest_id>', methods=['GET'])

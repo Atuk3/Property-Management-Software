@@ -4,23 +4,47 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Guest Profile</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        .container {
+            max-width: 900px;
+            margin-top: 2rem;
+        }
+        .table th, .table td {
+            text-align: center;
+        }
+        .card {
+            border-radius: 0.5rem;
+        }
+        .card-title {
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+        }
+    </style>
 </head>
 <body>
-    <div class="container mt-5">
-        <h1>Guest Profile</h1>
-        <div class="card mb-4">
+    <div class="container">
+        <h1 class="mb-4">Guest Profile: <span class="text-primary">{{ guest.first_name }} {{ guest.last_name }}</span></h1>
+
+        <!-- Contact Information Card -->
+        <div class="card mb-4 shadow-sm">
             <div class="card-body">
-                <h5 class="card-title">{{ guest.name }}</h5>
+                <h5 class="card-title">Contact Information</h5>
                 <p class="card-text"><strong>Email:</strong> {{ guest.email }}</p>
                 <p class="card-text"><strong>Phone Number:</strong> {{ guest.phone_number }}</p>
+                <p class="card-text"><strong>Address:</strong> {{ guest.address }}</p>
+                <p class="card-text"><strong>ID:</strong> {{ guest.id_type }}</p>
+                <p class="card-text"><strong>ID Number:</strong> {{ guest.id_number }}</p>
             </div>
         </div>
 
-        <h2>Booking History</h2>
-        <table class="table table-bordered">
+        <!-- Booking History -->
+        <h3 class="mb-3">Booking History</h3>
+        <table class="table table-striped table-bordered">
             <thead class="thead-dark">
                 <tr>
+                    <th>Room Number</th>
                     <th>Check-In Date</th>
                     <th>Check-Out Date</th>
                     <th>Status</th>
@@ -30,16 +54,21 @@
             <tbody>
                 {% for booking in bookings %}
                 <tr>
-                    <td>{{ booking.check_in_date }}</td>
-                    <td>{{ booking.check_out_date }}</td>
+                    <td>{{ booking.room.room_number }}</td>
+                    <td>{{ booking.check_in_date.strftime('%Y-%m-%d') }}</td>
+                    <td>{{ booking.check_out_date.strftime('%Y-%m-%d') }}</td>
                     <td>{{ booking.status }}</td>
-                    <td>₦{{ booking.total_amount }}</td>
+                    <td>₦{{ booking.total_amount | round(2) }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
-        <a href="{{ url_for('manage_guests') }}" class="btn btn-secondary">Back to Guest List</a>
+
+        <!-- Back Button -->
+        <a href="{{ url_for('manage_guests') }}" class="btn btn-primary mt-3">Back to Guest List</a>
     </div>
+
+    <!-- Scripts -->
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.1/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>

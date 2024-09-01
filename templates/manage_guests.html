@@ -4,40 +4,82 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manage Guests</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        .container {
+            max-width: 1000px;
+            margin-top: 2rem;
+        }
+        h1 {
+            margin-bottom: 1.5rem;
+            font-weight: 600;
+            color: #343a40;
+        }
+        .table th, .table td {
+            text-align: center;
+            vertical-align: middle;
+        }
+        .search-bar {
+            margin-bottom: 1.5rem;
+        }
+        .search-bar .input-group {
+            max-width: 600px;
+            margin: auto;
+        }
+        .btn-info {
+            background-color: #17a2b8;
+            border-color: #17a2b8;
+        }
+        .btn-info:hover {
+            background-color: #138496;
+            border-color: #117a8b;
+        }
+        .table th {
+            background-color: #f8f9fa;
+        }
+        .table-hover tbody tr:hover {
+            background-color: #f1f3f5;
+        }
+    </style>
 </head>
 <body>
-    <div class="container mt-5">
-        <h1>Manage Guests</h1>
-        <form method="GET" action="{{ url_for('manage_guests') }}" class="mb-4">
-            <div class="form-group">
-                <input type="text" name="search" value="{{ search_query }}" class="form-control" placeholder="Search by name, email, or phone number">
+    <div class="container">
+        <h1 class="text-center">Manage Guests</h1>
+        <form method="GET" action="{{ url_for('manage_guests') }}" class="search-bar">
+            <div class="input-group">
+                <input type="text" name="search" class="form-control" placeholder="Search for guests..." value="{{ search_query }}">
+                <div class="input-group-append">
+                    <button class="btn btn-primary" type="submit">Search</button>
+                </div>
             </div>
-            <button type="submit" class="btn btn-primary">Search</button>
         </form>
-        
-        <table class="table table-bordered">
-            <thead class="thead-dark">
-                <tr>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Phone Number</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for guest in guests %}
-                <tr>
-                    <td>{{ guest.name }}</td>
-                    <td>{{ guest.email }}</td>
-                    <td>{{ guest.phone_number }}</td>
-                    <td>
-                        <a href="{{ url_for('view_guest_profile', guest_id=guest.id) }}" class="btn btn-info btn-sm">View Profile</a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover">
+                <thead class="thead-light">
+                    <tr>
+                        <th>First Name</th>
+                        <th>Last Name</th>
+                        <th>Email</th>
+                        <th>Phone Number</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for guest in guests %}
+                    <tr>
+                        <td>{{ guest.first_name }}</td>
+                        <td>{{ guest.last_name }}</td>
+                        <td>{{ guest.email }}</td>
+                        <td>{{ guest.phone_number }}</td>
+                        <td>
+                            <a href="{{ url_for('view_guest_profile', guest_id=guest.id) }}" class="btn btn-info btn-sm">View Profile</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.1/dist/umd/popper.min.js"></script>
