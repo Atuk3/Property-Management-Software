@@ -74,6 +74,9 @@ class Booking(db.Model):
     id_number = db.Column(db.String(50), nullable=False)
     check_in_date = db.Column(db.Date, nullable=False)
     check_out_date = db.Column(db.Date, nullable=False)
+    children_number = db.Column(db.Integer, nullable=False)
+    adults_number = db.Column(db.Integer, nullable=False)
+    status = db.Column(db.String(20), nullable=False, default='Pending')
     room_id = db.Column(db.Integer, db.ForeignKey('room.id'), nullable=False)
     total_amount = db.Column(db.Float, nullable=False)
 
@@ -85,7 +88,7 @@ class Booking(db.Model):
         num_nights = (self.check_out_date - self.check_in_date).days
         return room.price * num_nights
 
-    def __init__(self, first_name, last_name, phone_number, email, address, id_type, id_number, check_in_date, check_out_date, room_id, total_amount):
+    def __init__(self, first_name, last_name, phone_number, email, address, id_type, id_number, check_in_date, check_out_date, room_id, total_amount,children_number,adults_number,status):
         self.first_name = first_name
         self.last_name = last_name
         self.phone_number = phone_number
@@ -96,6 +99,9 @@ class Booking(db.Model):
         self.check_in_date = check_in_date
         self.check_out_date = check_out_date
         self.room_id = room_id
+        self.children_number = children_number
+        self.adults_number = adults_number
+        self.status = status
         self.total_amount = self.calculate_total_amount()
 
     
@@ -156,8 +162,11 @@ class BookingForm(FlaskForm):
     address = StringField('Address', validators=[DataRequired()])
     id_type = SelectField('ID Type', choices=[('nin', 'NIN'), ('drivers_license', 'Driver\'s License'), ('id_card', 'ID Card')], validators=[DataRequired()])
     id_number = StringField('ID Number', validators=[DataRequired()])
+    adults_number=StringField('Adults Number', validators=[DataRequired()])
+    children_number=StringField('Children Number', validators=[DataRequired()])
     check_in_date = DateField('Check-in Date', format='%Y-%m-%d', validators=[DataRequired()])
     check_out_date = DateField('Check-out Date', format='%Y-%m-%d', validators=[DataRequired()])
+    status = SelectField('Status', choices=[('Pending', 'Pending'), ('Confirmed', 'Confirmed'), ('Cancelled', 'Cancelled')], validators=[DataRequired()])
     total_amount = DecimalField('Total Amount (₦)', places=2, validators=[DataRequired(), NumberRange(min=0)], render_kw={'readonly': True})
     
     submit = SubmitField('Submit')
@@ -313,16 +322,14 @@ def delete_room(room_id):
 
 @app.route('/bookings', methods=['GET'])
 def manage_bookings():
-    start_date = request.args.get('start_date')
-    end_date = request.args.get('end_date')
+    
     phone_number = request.args.get('phone_number')
     last_name = request.args.get('last_name')
 
     bookings = Booking.query
 
     
-    if start_date and end_date:
-        bookings = bookings.filter(Booking.check_in_date >= start_date, Booking.check_out_date <= end_date)
+    
 
     if phone_number:
         bookings = bookings.filter(Booking.phone_number.like(f'%{phone_number}%'))
@@ -330,10 +337,10 @@ def manage_bookings():
     if last_name:
         bookings = bookings.filter(Booking.last_name.like(f'%{last_name}%'))
 
-    bookings = bookings.all()
+    bookings = Booking.query.order_by(Booking.check_in_date.desc()).all()
 
 
-    return render_template('manage_bookings.html', bookings=bookings, start_date=start_date, end_date=end_date)
+    return render_template('manage_bookings.html', bookings=bookings,phone_number=phone_number,last_name=last_name)
 
 @app.route('/bookings/add', methods=['GET', 'POST'])
 def add_booking():
@@ -348,6 +355,9 @@ def add_booking():
             id_type=form.id_type.data,
             id_number=form.id_number.data,
             room_id=form.room_id.data,
+            children_number=form.children_number.data,
+            adults_number=form.adults_number.data,
+            status=form.status.data,
             check_in_date=form.check_in_date.data,
             check_out_date=form.check_out_date.data,
             total_amount=form.total_amount.data
@@ -385,6 +395,9 @@ def edit_booking(booking_id):
         booking.room_id = form.room_id.data
         booking.check_in_date = form.check_in_date.data
         booking.check_out_date = form.check_out_date.data
+        booking.children_number = form.children_number.data
+        booking.adults_number = form.adults_number.data
+        booking.status = form.status.data
         booking.id_type = form.id_type.data
         booking.id_number = form.id_number.data
         booking.total_amount = total_amount
@@ -397,10 +410,35 @@ def edit_booking(booking_id):
 @app.route('/bookings/delete/<int:booking_id>', methods=['POST'])
 def delete_booking(booking_id):
     booking = Booking.query.get_or_404(booking_id)
+    booking.status = 'Cancelled'
+    room = Room.query.get(booking.room_id)
+    room.status = 'Available'
     db.session.delete(booking)
     db.session.commit()
     flash('Booking deleted successfully!', 'danger')
     return redirect(url_for('manage_bookings'))
+
+@app.route('/bookings/check_in/<int:booking_id>', methods=['POST'])
+def check_in(booking_id):
+    booking = Booking.query.get_or_404(booking_id)
+    booking.status = 'Checked In'
+    db.session.commit()
+   
+    return redirect(url_for('manage_bookings'))
+
+@app.route('/bookings/check_out/<int:booking_id>', methods=['POST'])
+def check_out(booking_id):
+    booking = Booking.query.get_or_404(booking_id)
+    booking.status = 'Checked Out'
+    room = Room.query.get(booking.room_id)
+    room.status = 'Available'
+    db.session.commit()
+    return redirect(url_for('manage_bookings'))
+
+@app.route('/bookings/history')
+def booking_history():
+    bookings = Booking.query.order_by(Booking.check_in_date.desc()).all()
+    return render_template('booking_history.html', bookings=bookings)
 
 @app.route('/guests', methods=['GET'])
 def manage_guests():

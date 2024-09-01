@@ -12,7 +12,7 @@
         <table class="table table-bordered">
             <thead>
                 <tr>
-                    <th>Guest Name</th>
+                    <!-- <th>Guest Name</th> -->
                     <th>Room</th>
                     <th>Check-In Date</th>
                     <th>Check-Out Date</th>
@@ -23,7 +23,7 @@
             <tbody>
                 {% for booking in bookings %}
                 <tr>
-                    <td>{{ booking.guest_name }}</td>
+                    <!-- <td>{{ booking.guest_name }}</td> -->
                     <td>{{ booking.room.room_number }}</td>
                     <td>{{ booking.check_in_date }}</td>
                     <td>{{ booking.check_out_date }}</td>
