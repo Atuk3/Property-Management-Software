@@ -233,11 +233,25 @@ def login():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-     # Fetch data for the dashboard
-    # booking = Booking.query.all()
-    rooms = Room.query.all()  # Example: get all rooms
-    # revenue = calculate_revenue()  # Define a function to calculate revenue
-    return render_template('dashboard.html', current_user=current_user, rooms=rooms)
+    # Fetch total bookings
+    total_bookings = Booking.query.count()
+
+    # Fetch total occupied rooms
+    total_rooms_occupied = Room.query.filter_by(status='Occupied').count()
+
+    # Fetch total revenue
+    total_revenue = db.session.query(func.sum(Booking.total_amount)).scalar() or 0
+
+    # Fetch recent bookings (last 5)
+    recent_bookings = Booking.query.order_by(Booking.check_in_date.desc()).limit(5).all()
+
+    return render_template(
+        'dashboard.html', 
+        total_bookings=total_bookings, 
+        total_rooms_occupied=total_rooms_occupied, 
+        total_revenue=total_revenue, 
+        recent_bookings=recent_bookings
+    )
 
 @app.route('/reservations', methods=['GET', 'POST'])
 @login_required

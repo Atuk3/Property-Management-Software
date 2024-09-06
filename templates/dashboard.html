@@ -33,53 +33,93 @@
             <p>Welcome to your dashboard. Use the side navigation to manage different aspects of the hotel.</p>
         </div>
 
-        <div class="container">
-            
-            
-            <h2>Upcoming Reservations</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Reservation ID</th>
-                        <th>Guest Name</th>
-                        <th>Room</th>
-                        <th>Check-in Date</th>
-                        <th>Check-out Date</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for booking in bookings %}
-                    <tr>
-                        <td>{{ booking.id }}</td>
-                        <td>{{ reservation.guest_name }}</td>
-                        <td>{{ booking.room_number }}</td>
-                        <td>{{ reservation.check_in_date }}</td>
-                        <td>{{ reservation.check_out_date }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-    
-            <h2>Room Status</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Room Number</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for room in rooms %}
-                    <tr>
-                        <td>{{ room.room_number }}</td>
-                        <td>{{ room.status }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-    
-            <h2>Revenue Report</h2>
-            <p>Total Revenue: ${{ revenue }}</p>
+        <div class="row">
+            <!-- Total Bookings -->
+            <div class="col-lg-4 col-md-6 mb-4">
+                <div class="card border-left-primary shadow h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                    Total Bookings</div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_bookings }}</div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-calendar fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        
+            <!-- Rooms Occupied -->
+            <div class="col-lg-4 col-md-6 mb-4">
+                <div class="card border-left-success shadow h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                    Rooms Occupied</div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_rooms_occupied }}</div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-bed fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        
+            <!-- Total Revenue -->
+            <div class="col-lg-4 col-md-6 mb-4">
+                <div class="card border-left-warning shadow h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                    Total Revenue (₦)</div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_revenue }}</div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Recent Bookings Table -->
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Recent Bookings</h6>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                        <thead>
+                            <tr>
+                                <th>Guest Name</th>
+                                <th>Check-In Date</th>
+                                <th>Check-Out Date</th>
+                                <th>Total Amount</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for booking in recent_bookings %}
+                            <tr>
+                                <td>{{ booking.guest.first_name }} {{ booking.guest.last_name }}</td>
+                                <td>{{ booking.check_in_date }}</td>
+                                <td>{{ booking.check_out_date }}</td>
+                                <td>₦{{ booking.total_amount }}</td>
+                                <td>{{ booking.status }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 
