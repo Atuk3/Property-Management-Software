@@ -42,13 +42,36 @@ class User(db.Model, UserMixin):
 
 class Reservation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    guest_name = db.Column(db.String(150), nullable=False)
-    check_in = db.Column(db.Date, nullable=False)
-    check_out = db.Column(db.Date, nullable=False)
-    room_number = db.Column(db.String(10), nullable=False)
-    notes = db.Column(db.Text, nullable=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    user = db.relationship('User', backref=db.backref('reservations', lazy=True))
+    first_name = db.Column(db.String(100), nullable=False)
+    last_name = db.Column(db.String(100), nullable=False)
+    phone_number = db.Column(db.String(20), nullable=False)
+    email = db.Column(db.String(120), nullable=False)
+    check_in_date = db.Column(db.Date, nullable=False)
+    check_out_date = db.Column(db.Date, nullable=False)
+    room_id = db.Column(db.Integer, db.ForeignKey('room.id'), nullable=False)
+    total_amount = db.Column(db.Float, nullable=False)
+    status = db.Column(db.String(20), nullable=False, default='Reserved') #Reserved, Cancelled.
+
+
+    def calculate_total_amount(self):
+        # Assuming Room model has a price attribute
+        room = Room.query.get(self.room_id)
+        num_nights = (self.check_out_date - self.check_in_date).days
+        return room.price * num_nights
+
+    def __init__(self, first_name, last_name, phone_number, email, check_in_date, check_out_date, room_id, total_amount,status):
+        self.first_name = first_name
+        self.last_name = last_name
+        self.phone_number = phone_number
+        self.email = email
+        self.check_in_date = check_in_date
+        self.check_out_date = check_out_date
+        self.room_id = room_id
+        self.status = status
+        self.total_amount = self.calculate_total_amount()
+   
+
+
 
 class Room(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -59,6 +82,8 @@ class Room(db.Model):
 
     # This defines a relationship to Booking and sets the backref as 'room' in Booking.
     bookings = db.relationship('Booking', backref='room', lazy=True)
+     # This defines a relationship to Reservation and sets the backref as 'room' in Reservation.
+    reservations = db.relationship('Reservation', backref='room', lazy=True)
 
     def __repr__(self):
         return f"<Room {self.room_number}, Type {self.room_type}>"
@@ -144,17 +169,34 @@ class LoginForm(FlaskForm):
 
 
 class ReservationForm(FlaskForm):
-    guest_name = StringField('Guest Name', validators=[DataRequired()])
-    check_in = DateField('Check-in Date', format='%Y-%m-%d', validators=[DataRequired()])
-    check_out = DateField('Check-out Date', format='%Y-%m-%d', validators=[DataRequired()])
-    room_number = StringField('Room Number', validators=[DataRequired()])
-    notes = TextAreaField('Notes')
+    first_name = StringField('First Name', validators=[DataRequired()])
+    last_name = StringField('Last Name', validators=[DataRequired()])
+    check_in_date = DateField('Check-in Date', format='%Y-%m-%d', validators=[DataRequired()])
+    check_out_date = DateField('Check-out Date', format='%Y-%m-%d', validators=[DataRequired()])
+    room_id = SelectField('Room', coerce=int, validators=[DataRequired()])
+    phone_number = StringField('Phone Number', validators=[DataRequired()])
+    email = StringField('Email', validators=[DataRequired()])
+    status = SelectField('Status', choices=[('Reserved', 'Reserved'),('Cancelled', 'Cancelled')], validators=[DataRequired()])
+    total_amount = DecimalField('Total Amount (₦)', places=2, validators=[DataRequired(), NumberRange(min=0)], render_kw={'readonly': True})
     submit = SubmitField('Save Reservation')
+
+    def calculate_total_price(self):
+        # Calculate number of nights
+        nights = (self.check_out_date.data - self.check_in_date.data).days
+        if nights <= 0:
+            nights = 1  # Minimum of one night
+
+        # Fetch room details
+        room = Room.query.get(self.room_id.data)
+        if room:
+            # Calculate total price
+            return room.price * nights
+        return 0
 
 class RoomForm(FlaskForm):
     room_number = StringField('Room Number', validators=[DataRequired(), Length(min=1, max=10)])
     room_type = SelectField('Room Type', choices=[('Standard 1', 'Standard 1'), ('Standard 2', 'Standard 2'), ('Executive', 'Executive'), ('Executive Wing B', 'Executive Wing B'), ('Exclusive', 'Exclusive')], validators=[DataRequired()])
-    status = SelectField('Status', choices=[('Available', 'Available'), ('Occupied', 'Occupied'), ('Maintenance', 'Maintenance')], validators=[DataRequired()])
+    status = SelectField('Status', choices=[('Available', 'Available'), ('Occupied', 'Occupied'), ('Maintenance', 'Maintenance'), ('Cleaning', 'Cleaning')], validators=[DataRequired()])
     price = DecimalField('Price', validators=[DataRequired()])
     submit = SubmitField('Save')
 
@@ -253,27 +295,105 @@ def dashboard():
         recent_bookings=recent_bookings
     )
 
-@app.route('/reservations', methods=['GET', 'POST'])
+# Route to view all reservations
+@app.route('/reservations', methods=['GET'])
 @login_required
-def reservations():
-    
+def manage_reservations():
+    # Filter reservations by status or guest name
+    status = request.args.get('status', '')
+    last_name = request.args.get('last_name', '')
+
+    query = Reservation.query
+    if status:
+        query = query.filter_by(status=status)
+    if last_name:
+        query = query.filter(Reservation.last_name.like(f'%{last_name}%'))
+
+    reservations = query.order_by(Reservation.check_in_date.desc()).all()
+
+    return render_template('manage_reservations.html', reservations=reservations, status=status, last_name=last_name)
+
+
+# Route to add a new reservation
+@app.route('/reservations/add', methods=['GET', 'POST'])
+@login_required
+def add_reservation():
     form = ReservationForm()
+
+    # Dynamically populate available room choices
+    available_rooms = Room.query.filter_by(status='Available').all()
+    form.room_id.choices = [(room.id, f'Room {room.room_number} - {room.room_type} (₦{room.price})') for room in available_rooms]
+
     if form.validate_on_submit():
+        # Create a new reservation
         new_reservation = Reservation(
-            guest_name=form.guest_name.data,
-            check_in=form.check_in.data,
-            check_out=form.check_out.data,
-            room_number=form.room_number.data,
-            notes=form.notes.data,
-            user_id=current_user.id
+            first_name=form.first_name.data,
+            last_name=form.last_name.data,
+            email=form.email.data,
+            phone_number=form.phone_number.data,
+            check_in_date=form.check_in_date.data,
+            check_out_date=form.check_out_date.data,
+            room_id=form.room_id.data,
+            total_amount=form.calculate_total_price(),
+            status=form.status.data
         )
+        
+        # Mark the room as "Occupied"
+        room = Room.query.get(form.room_id.data)
+        room.status = 'Reserved'
+
+        # Commit changes
         db.session.add(new_reservation)
         db.session.commit()
-        print('Reservation created successfully!')
-        return redirect(url_for('reservations'))
+        flash('Reservation successfully created!', 'success')
+        return redirect(url_for('manage_reservations'))
 
-    reservations = Reservation.query.all()
-    return render_template('reservations.html', form=form, reservations=reservations)
+    return render_template('add_reservation.html', form=form)
+
+
+# Route to edit a reservation
+@app.route('/reservations/edit/<int:reservation_id>', methods=['GET', 'POST'])
+@login_required
+def edit_reservation(reservation_id):
+    reservation = Reservation.query.get_or_404(reservation_id)
+    form = ReservationForm(obj=reservation)
+
+    available_rooms = Room.query.filter_by(status='Available').all()
+    form.room_id.choices = [(room.id, f'Room {room.room_number} - {room.room_type} (₦{room.price})') for room in available_rooms]
+
+    if form.validate_on_submit():
+        # Update reservation details
+        reservation.first_name = form.first_name.data
+        reservation.last_name = form.last_name.data
+        reservation.email = form.email.data
+        reservation.check_in_date = form.check_in_date.data
+        reservation.check_out_date = form.check_out_date.data
+        reservation.room_id = form.room_id.data
+        reservation.total_amount = form.calculate_total_price()
+        reservation.status = form.status.data
+
+        db.session.commit()
+        flash('Reservation updated successfully!', 'success')
+        return redirect(url_for('manage_reservations'))
+
+    return render_template('edit_reservation.html', form=form, reservation=reservation)
+
+
+# Route to delete a reservation
+@app.route('/reservations/delete/<int:reservation_id>', methods=['POST'])
+@login_required
+def delete_reservation(reservation_id):
+    reservation = Reservation.query.get_or_404(reservation_id)
+    
+    # Update the room's status to "Available"
+    room = Room.query.get(reservation.room_id)
+    room.status = 'Available'
+
+    # Delete reservation
+    db.session.delete(reservation)
+    db.session.commit()
+    flash('Reservation deleted successfully!', 'success')
+    return redirect(url_for('manage_reservations'))
 
 @app.route('/logout')
 @login_required
@@ -394,7 +514,7 @@ def add_booking():
 
         # Create the booking
         new_booking = Booking(
-             guest_id=guest.id,  # Link the guest to the booking
+            guest_id=guest.id,  # Link the guest to the booking
             first_name=form.first_name.data,
             last_name=form.last_name.data,
             phone_number=form.phone_number.data,
