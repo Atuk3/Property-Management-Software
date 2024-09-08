@@ -78,6 +78,11 @@
                         <form action="{{ url_for('delete_room', room_id=room.id) }}" method="POST" style="display:inline;">
                             <button type="submit" class="btn btn-danger btn-sm">Delete</button>
                         </form>
+                        {% if room.status == 'Dirty' %}
+                         <form action="{{ url_for('mark_room_clean', room_id=room.id) }}" method="POST" style="display:inline;">
+                         <button type="submit" class="btn btn-success btn-sm">Cleaned</button>
+                         </form>
+                         {% endif %}
                     </td>
                 </tr>
                 {% endfor %}

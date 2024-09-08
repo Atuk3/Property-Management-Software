@@ -276,10 +276,16 @@ def login():
 @login_required
 def dashboard():
     # Fetch total bookings
-    total_bookings = Booking.query.count()
+    total_bookings = Booking.query.filter_by(status='Checked In').count()
+    # Fetch total reservations
+    total_reservations = Reservation.query.filter_by(status='Reserved').count()
 
     # Fetch total occupied rooms
     total_rooms_occupied = Room.query.filter_by(status='Occupied').count()
+    # Fetch total available rooms
+    total_rooms_available = Room.query.filter_by(status='Available').count()
+     # Fetch total dirty rooms
+    total_rooms_dirty = Room.query.filter_by(status='Dirty').count()
 
     # Fetch total revenue
     total_revenue = db.session.query(func.sum(Booking.total_amount)).scalar() or 0
@@ -289,10 +295,14 @@ def dashboard():
 
     return render_template(
         'dashboard.html', 
-        total_bookings=total_bookings, 
-        total_rooms_occupied=total_rooms_occupied, 
-        total_revenue=total_revenue, 
-        recent_bookings=recent_bookings
+        total_bookings=total_bookings,
+        total_reservations=total_reservations,
+        total_rooms_available=total_rooms_available,
+        total_rooms_dirty=total_rooms_dirty,
+        total_revenue=total_revenue,
+        recent_bookings=recent_bookings,
+        total_rooms_occupied=total_rooms_occupied 
+        
     )
 
 # Route to view all reservations
@@ -459,6 +469,16 @@ def delete_room(room_id):
     flash('Room deleted successfully!', 'success')
     return redirect(url_for('manage_rooms'))
 
+@app.route('/rooms/clean/<int:room_id>', methods=['POST'])
+@login_required
+def mark_room_clean(room_id):
+    room = Room.query.get_or_404(room_id)
+    if room.status == 'Dirty':
+        room.status = 'Available'
+        db.session.commit()
+        flash('Room is now available.', 'success')
+    return redirect(url_for('manage_rooms'))
+
 @app.route('/bookings', methods=['GET'])
 def manage_bookings():
     
@@ -484,6 +504,12 @@ def manage_bookings():
 @app.route('/bookings/add', methods=['GET', 'POST'])
 def add_booking():
     form = BookingForm()
+    # Fetch rooms that are either "Available" or "Reserved"
+    available_rooms = Room.query.filter(Room.status.in_(['Available', 'Reserved'])).all()
+
+ # Populate the room choices in the form
+    form.room_id.choices = [(room.id, f'Room {room.room_number} - {room.room_type} (₦{room.price})') for room in available_rooms]
+
     if form.validate_on_submit():
          # Check if the guest already exists based on email or other identifier
         guest = Guest.query.filter_by(email=form.email.data).first()
@@ -535,6 +561,12 @@ def add_booking():
         if room:
             room.status = 'Occupied'  # Update room status to 'occupied'
 
+  # Fetch the reservation linked to this booking (if exists) and update its status
+        reservation = Reservation.query.filter_by(room_id=form.room_id.data).first()
+        if reservation:
+            reservation.status = 'Checked In'  # Update reservation status to 'Checked In'
+
+            
         db.session.add(new_booking)
         db.session.commit()
         flash('Booking added successfully!', 'success')
@@ -599,7 +631,7 @@ def check_out(booking_id):
     booking = Booking.query.get_or_404(booking_id)
     booking.status = 'Checked Out'
     room = Room.query.get(booking.room_id)
-    room.status = 'Available'
+    room.status = 'Dirty'
     db.session.commit()
     return redirect(url_for('manage_bookings'))
 
@@ -607,6 +639,70 @@ def check_out(booking_id):
 def booking_history():
     bookings = Booking.query.order_by(Booking.check_in_date.desc()).all()
     return render_template('booking_history.html', bookings=bookings)
+
+@app.route('/reservations/check_in/<int:reservation_id>', methods=['GET', 'POST'])
+@login_required
+def check_in_reservation(reservation_id):
+    # Fetch the reservation by ID
+    reservation = Reservation.query.get_or_404(reservation_id)
+
+     # Dynamically populate available room choices (including the reserved room)
+    available_rooms = Room.query.filter(Room.status.in_(['Available', 'Reserved'])).all()
+
+
+    # Pre-fill the BookingForm with the reservation details
+    form = BookingForm(
+        first_name=reservation.first_name,
+        last_name=reservation.last_name,
+        phone_number=reservation.phone_number,
+        email=reservation.email,
+        room_id=reservation.room_id,
+        check_in_date=reservation.check_in_date,
+        check_out_date=reservation.check_out_date,
+        total_amount=reservation.total_amount
+    )
+
+      # Set the room choices in the form, making sure the reserved room is included
+    form.room_id.choices = [(room.id, f'Room {room.room_number} - {room.room_type} (₦{room.price})') for room in available_rooms]
+
+
+    # If the form is submitted, save the booking and mark the room as occupied
+    if form.validate_on_submit():
+        guest = Guest.query.filter_by(email=form.email.data).first()
+        if guest is None:
+            guest = Guest(
+                first_name=form.first_name.data,
+                last_name=form.last_name.data,
+                phone_number=form.phone_number.data,
+                email=form.email.data,
+                address=form.address.data,
+                id_type=form.id_type.data,
+                id_number=form.id_number.data
+            )
+            db.session.add(guest)
+            db.session.commit()
+        new_booking = Booking(
+            guest_id=guest.id,
+            first_name=form.first_name.data,
+            last_name=form.last_name.data,
+            phone_number=form.phone_number.data,
+            email=form.email.data,
+            room_id=form.room_id.data,
+            check_in_date=form.check_in_date.data,
+            check_out_date=form.check_out_date.data,
+            status='Checked In',
+            total_amount=reservation.total_amount  # Use the same total amount from reservation
+        )
+
+        room = Room.query.get(form.room_id.data)
+        room.status = 'Occupied'
+
+        db.session.add(new_booking)
+        db.session.commit()
+        flash('Guest successfully checked in!', 'success')
+        return redirect(url_for('manage_bookings'))
+
+    return render_template('add_booking.html', form=form)
 
 @app.route('/guests', methods=['GET'])
 def manage_guests():
@@ -627,6 +723,8 @@ def view_guest_profile(guest_id):
     guest = Guest.query.get_or_404(guest_id)
     bookings = Booking.query.filter_by(guest_id=guest.id).all()
     return render_template('view_guest_profile.html', guest=guest, bookings=bookings)
+
+
 
 if __name__ == '__main__':
     with app.app_context():
