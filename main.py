@@ -3,7 +3,7 @@ import json
 import os
 import io
 import psycopg2
-from datetime import datetime
+from datetime import date
 from flask import Flask,render_template, request, jsonify,flash,url_for,redirect,session,make_response
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
@@ -212,8 +212,8 @@ class BookingForm(FlaskForm):
     adults_number=StringField('Adults Number', validators=[DataRequired()])
     children_number=StringField('Children Number', validators=[DataRequired()])
     check_in_date = DateField('Check-in Date', format='%Y-%m-%d', validators=[DataRequired()])
-    check_out_date = DateField('Check-out Date', format='%Y-%m-%d', validators=[DataRequired()])
-    status = SelectField('Status', choices=[('Pending', 'Pending'), ('Confirmed', 'Confirmed'), ('Cancelled', 'Cancelled')], validators=[DataRequired()])
+    check_out_date = DateField('Check-out Date', format='%Y-%m-%d')
+    status = SelectField('Status', choices=[('Pending', 'Pending')], validators=[DataRequired()])
     total_amount = DecimalField('Total Amount (₦)', places=2, validators=[DataRequired(), NumberRange(min=0)], render_kw={'readonly': True})
     
     submit = SubmitField('Submit')
@@ -477,7 +477,29 @@ def mark_room_clean(room_id):
         room.status = 'Available'
         db.session.commit()
         flash('Room is now available.', 'success')
-    return redirect(url_for('manage_rooms'))
+    return redirect(url_for('housekeeping'))
+
+@app.route('/housekeeping', methods=['GET'])
+@login_required
+def housekeeping():
+    # Fetch rooms that are either "Occupied" or "Dirty" (to be cleaned)
+  rooms = Room.query.filter(Room.status.in_(['Occupied', 'Dirty'])).order_by(Room.room_number).all()
+  return render_template('housekeeping.html', rooms=rooms)
+
+@app.route('/rooms/edit_status/<int:room_id>', methods=['POST'])
+@login_required
+def edit_room_status(room_id):
+    room = Room.query.get_or_404(room_id)
+
+    # Logic to update the room status based on the current state
+    if room.status == 'Occupied':
+        room.status = 'Dirty'
+    elif room.status == 'Dirty':
+        room.status = 'Available'
+
+    db.session.commit()
+    flash(f"Room status updated to {room.status}!", 'success')
+    return redirect(url_for('housekeeping'))
 
 @app.route('/bookings', methods=['GET'])
 def manage_bookings():
@@ -509,6 +531,9 @@ def add_booking():
 
  # Populate the room choices in the form
     form.room_id.choices = [(room.id, f'Room {room.room_number} - {room.room_type} (₦{room.price})') for room in available_rooms]
+
+    # Automatically set the check-in date to today and mark it as readonly
+    form.check_in_date.data = date.today()
 
     if form.validate_on_submit():
          # Check if the guest already exists based on email or other identifier
@@ -552,7 +577,7 @@ def add_booking():
             children_number=form.children_number.data,
             adults_number=form.adults_number.data,
             status=form.status.data,
-            check_in_date=form.check_in_date.data,
+            check_in_date=date.today(),  # Set check-in date to today
             check_out_date=form.check_out_date.data,
             total_amount=form.total_amount.data
         )
@@ -622,6 +647,7 @@ def delete_booking(booking_id):
 def check_in(booking_id):
     booking = Booking.query.get_or_404(booking_id)
     booking.status = 'Checked In'
+    booking.check_in_date = date.today()  # Automatically set the check-in date
     db.session.commit()
    
     return redirect(url_for('manage_bookings'))
@@ -631,14 +657,28 @@ def check_out(booking_id):
     booking = Booking.query.get_or_404(booking_id)
     booking.status = 'Checked Out'
     room = Room.query.get(booking.room_id)
-    room.status = 'Dirty'
+    room.status = 'Dirty' # Mark room as dirty after checkout
+    booking.check_out_date = date.today()  # Automatically set the check-out date
     db.session.commit()
     return redirect(url_for('manage_bookings'))
 
-@app.route('/bookings/history')
-def booking_history():
-    bookings = Booking.query.order_by(Booking.check_in_date.desc()).all()
-    return render_template('booking_history.html', bookings=bookings)
+@app.route('/bookinghistory')
+def bookinghistory():
+    last_name = request.args.get('last_name')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+
+     # Fetch all bookings
+    query = Booking.query.order_by(Booking.check_in_date.desc())
+
+    # Apply filters if provided
+    if last_name:
+        query = query.filter_by(last_name=last_name)
+    if start_date and end_date:
+        query = query.filter(Booking.check_in_date.between(start_date, end_date))
+
+    bookings = query.all()  # Use the filtered query here
+    return render_template('bookinghistory.html', bookings=bookings)
 
 @app.route('/reservations/check_in/<int:reservation_id>', methods=['GET', 'POST'])
 @login_required
