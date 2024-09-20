@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="/static/css/dashboard.css" />
 </head>
 <body>
+    
 
     <!-- Sidebar Navigation -->
     <div class="sidebar">
@@ -124,14 +125,14 @@
                 </div>
             </div>
         
-            <!-- Total Revenue -->
+            <!-- Today's Revenue -->
             <div class="col-lg-4 col-md-6 mb-4">
                 <div class="card border-left-warning shadow h-100 py-2">
                     <div class="card-body">
                         <div class="row no-gutters align-items-center">
                             <div class="col mr-2">
                                 <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
-                                    Total Revenue (₦)</div>
+                                    Today's Revenue (₦)</div>
                                 <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_revenue }}</div>
                             </div>
                             <div class="col-auto">
@@ -142,6 +143,98 @@
                 </div>
             </div>
         </div>
+        
+       
+        <!-- Guests Arriving Today -->
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Guests Arriving Today</h6>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                        <thead>
+                            <tr>
+                                <th>Guest Name</th>
+                                <th>Room Number</th>
+                                <th>Room Type</th>
+                                <th>Check-In Date</th>
+                                <th>Phone Number</th>
+                                <th>Email</th>
+                                
+                                
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if guests_arriving_today %}
+                                {% for reservation in guests_arriving_today %}
+                            <tr>
+                                <td>{{ reservation.first_name }} {{ reservation.last_name }}</td>
+                                <td>{{ reservation.room.room_number }}</td>
+                                <td>{{ reservation.room.room_type }}</td>
+                                <td>{{ reservation.check_in_date }}</td>
+                                <td>{{ reservation.phone_number }}</td>
+                                <td>{{ reservation.email }}</td>
+                                
+                               
+                            </tr>
+                            {% endfor %}
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">No guests arriving today</td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+         <!-- Guests Departing Today -->
+         <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Guests Departing Today</h6>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                        <thead>
+                            <tr>
+                                <th>Guest Name</th>
+                                <th>Room Number</th>
+                                <th>Room Type</th>
+                                <th>Check-Out Date</th>
+                                <th>Phone Number</th>
+                                <th>Email</th>
+
+                                
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if guests_departing_today %}
+                                {% for booking in guests_departing_today %} 
+                            <tr>
+                                <td>{{ booking.guest.first_name }} {{ booking.guest.last_name }}</td>
+                                <td>{{ booking.room.room_number }}</td>
+                                <td>{{ booking.room.room_type }}</td>
+                                <td>{{ booking.check_out_date }}</td>
+                                <td>{{ booking.phone_number }}</td>
+                                <td>{{ booking.email }}</td>
+                                
+                               
+                            </tr>
+                            {% endfor %}
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">No guests departing today</td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+
         
         <!-- Recent Bookings Table -->
         <div class="card shadow mb-4">

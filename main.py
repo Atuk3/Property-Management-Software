@@ -272,23 +272,51 @@ def login():
        
     return render_template('login.html', form=form)
 
+from datetime import date
+
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    # Fetch total bookings
+    # Fetch total bookings (checked in)
     total_bookings = Booking.query.filter_by(status='Checked In').count()
-    # Fetch total reservations
+
+    # Fetch total reservations (not yet checked in)
     total_reservations = Reservation.query.filter_by(status='Reserved').count()
 
     # Fetch total occupied rooms
     total_rooms_occupied = Room.query.filter_by(status='Occupied').count()
+
     # Fetch total available rooms
     total_rooms_available = Room.query.filter_by(status='Available').count()
-     # Fetch total dirty rooms
+
+    # Fetch total dirty rooms
     total_rooms_dirty = Room.query.filter_by(status='Dirty').count()
 
-    # Fetch total revenue
-    total_revenue = db.session.query(func.sum(Booking.total_amount)).scalar() or 0
+    # Get current date
+    today = date.today()
+
+    # Fetch guests arriving today (check-in date is today and status is Reserved)
+    guests_arriving_today = Reservation.query.filter_by(check_in_date=today, status='Reserved').all()
+
+    # Fetch guests departing today (check-out date is today and status is Checked In)
+    guests_departing_today = Booking.query.filter_by(check_out_date=today, status='Checked In').all()
+
+    # Fetch total revenue for today (already provided earlier)
+    active_bookings = Booking.query.filter(
+        Booking.check_in_date <= today,
+        Booking.check_out_date >= today
+    ).all()
+
+    total_revenue_today = 0
+    for booking in active_bookings:
+        number_of_nights = (booking.check_out_date - booking.check_in_date).days
+        if number_of_nights > 0:  # Avoid division by zero
+            daily_rate = booking.total_amount / number_of_nights
+            total_revenue_today += daily_rate
+        else:
+            # Handle the case where number_of_nights is 0, if necessary
+            daily_rate = booking.total_amount  # Maybe assign the full amount if it's a single day stay
+            total_revenue_today += daily_rate
 
     # Fetch recent bookings (last 5)
     recent_bookings = Booking.query.order_by(Booking.check_in_date.desc()).limit(5).all()
@@ -299,11 +327,13 @@ def dashboard():
         total_reservations=total_reservations,
         total_rooms_available=total_rooms_available,
         total_rooms_dirty=total_rooms_dirty,
-        total_revenue=total_revenue,
+        total_revenue=total_revenue_today,  # Today's revenue
         recent_bookings=recent_bookings,
-        total_rooms_occupied=total_rooms_occupied 
-        
+        total_rooms_occupied=total_rooms_occupied,
+        guests_arriving_today=guests_arriving_today,
+        guests_departing_today=guests_departing_today
     )
+
 
 # Route to view all reservations
 @app.route('/reservations', methods=['GET'])
@@ -319,9 +349,11 @@ def manage_reservations():
     if last_name:
         query = query.filter(Reservation.last_name.like(f'%{last_name}%'))
 
-    reservations = query.order_by(Reservation.check_in_date.desc()).all()
+    # Order by reservation ID in descending order
+    reservations = query.order_by(Reservation.id.desc()).all()
 
     return render_template('manage_reservations.html', reservations=reservations, status=status, last_name=last_name)
+
 
 
 # Route to add a new reservation
@@ -483,7 +515,7 @@ def mark_room_clean(room_id):
 @login_required
 def housekeeping():
     # Fetch rooms that are either "Occupied" or "Dirty" (to be cleaned)
-  rooms = Room.query.filter(Room.status.in_(['Occupied', 'Dirty'])).order_by(Room.room_number).all()
+  rooms = Room.query.filter(Room.status.in_(['Occupied', 'Dirty','Available'])).order_by(Room.room_number).all()
   return render_template('housekeeping.html', rooms=rooms)
 
 @app.route('/rooms/edit_status/<int:room_id>', methods=['POST'])
@@ -496,6 +528,8 @@ def edit_room_status(room_id):
         room.status = 'Dirty'
     elif room.status == 'Dirty':
         room.status = 'Available'
+    elif room.status == 'Available':
+        room.status = 'Dirty'
 
     db.session.commit()
     flash(f"Room status updated to {room.status}!", 'success')
@@ -518,8 +552,7 @@ def manage_bookings():
     if last_name:
         bookings = bookings.filter(Booking.last_name.like(f'%{last_name}%'))
 
-    bookings = Booking.query.order_by(Booking.check_in_date.desc()).all()
-
+    bookings = bookings.order_by(Booking.id.desc()).all()
 
     return render_template('manage_bookings.html', bookings=bookings,phone_number=phone_number,last_name=last_name)
 
