@@ -289,6 +289,9 @@ def dashboard():
     # Fetch total available rooms
     total_rooms_available = Room.query.filter_by(status='Available').count()
 
+     # Fetch total available rooms and list them
+    available_rooms = Room.query.filter_by(status='Available').all()
+
     # Fetch total dirty rooms
     total_rooms_dirty = Room.query.filter_by(status='Dirty').count()
 
@@ -331,7 +334,8 @@ def dashboard():
         recent_bookings=recent_bookings,
         total_rooms_occupied=total_rooms_occupied,
         guests_arriving_today=guests_arriving_today,
-        guests_departing_today=guests_departing_today
+        guests_departing_today=guests_departing_today,
+        available_rooms=available_rooms  # Pass available rooms to template
     )
 
 

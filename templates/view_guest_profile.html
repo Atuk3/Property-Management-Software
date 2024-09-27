@@ -4,8 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Guest Profile</title>
+    
+    <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/dashboard.css" />
+
+    <!-- Additional Styling -->
     <style>
         .container {
             max-width: 900px;
@@ -16,25 +23,81 @@
         }
         .card {
             border-radius: 0.5rem;
+            margin-bottom: 2rem;
         }
         .card-title {
-            font-size: 1.25rem;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .sidebar {
+            position: fixed;
+            height: 100%;
+            background-color: #343a40;
+            padding: 1rem;
+            width: 200px;
+        }
+        .sidebar .nav-link {
+            color: white;
+            font-size: 1rem;
+            padding: 0.75rem 0;
+        }
+        .sidebar .nav-link.active, .sidebar .nav-link:hover {
+            background-color: #495057;
+            border-radius: 5px;
+        }
+        .sidebar img {
+            width: 120px;
             margin-bottom: 1rem;
         }
     </style>
 </head>
 <body>
-    <div class="container">
+    <!-- Sidebar Navigation -->
+    <div class="sidebar">
+        <div class="text-center">
+            <img src="/static/assets/images/planetgelimgbulogo.png" alt="Hotel Logo" class="img-fluid">
+        </div>
+
+        <nav class="nav flex-column">
+            <a class="nav-link active" href="/dashboard">
+                <i class="fas fa-tachometer-alt mr-2"></i>Dashboard
+            </a>
+            <a class="nav-link" href="/reservations">
+                <i class="fas fa-calendar-check mr-2"></i>Reservations
+            </a>
+            <a class="nav-link" href="/bookings">
+                <i class="fas fa-sign-in-alt mr-2"></i>Check In
+            </a>
+            <a class="nav-link" href="/rooms">
+                <i class="fas fa-door-closed mr-2"></i>Manage Rooms
+            </a>
+            <a class="nav-link" href="/housekeeping">
+                <i class="fas fa-broom mr-2"></i>Housekeeping
+            </a>
+            <a class="nav-link" href="/guests">
+                <i class="fas fa-users mr-2"></i>Guests
+            </a>
+            <a class="nav-link" href="/bookinghistory">
+                <i class="fas fa-history mr-2"></i>Check In History
+            </a>
+            <a class="nav-link" href="/logout">
+                <i class="fas fa-sign-out-alt mr-2"></i>Logout
+            </a>
+        </nav>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container" style="margin-left: 220px;">
         <h1 class="mb-4">Guest Profile: <span class="text-primary">{{ guest.first_name }} {{ guest.last_name }}</span></h1>
 
         <!-- Contact Information Card -->
-        <div class="card mb-4 shadow-sm">
+        <div class="card shadow-sm">
             <div class="card-body">
                 <h5 class="card-title">Contact Information</h5>
                 <p class="card-text"><strong>Email:</strong> {{ guest.email }}</p>
                 <p class="card-text"><strong>Phone Number:</strong> {{ guest.phone_number }}</p>
                 <p class="card-text"><strong>Address:</strong> {{ guest.address }}</p>
-                <p class="card-text"><strong>ID:</strong> {{ guest.id_type }}</p>
+                <p class="card-text"><strong>ID Type:</strong> {{ guest.id_type }}</p>
                 <p class="card-text"><strong>ID Number:</strong> {{ guest.id_number }}</p>
             </div>
         </div>
@@ -72,5 +135,6 @@
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.1/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="https://kit.fontawesome.com/a076d05399.js"></script>
 </body>
 </html>

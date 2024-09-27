@@ -17,18 +17,42 @@
     </style>
 </head>
 <body>
-     <!-- Sidebar Navigation -->
-     <div class="sidebar">
-        <h2>Planet G Hotel & Suites</h2>
-        <a href="/dashboard">Dashboard</a>
-        <a href="/reservations">Reservations</a>
-        <a href="/bookings">Check In</a>
-        <a href="/rooms">Manage Rooms</a>
-        <a href="#reports">Reports</a>
-        <a href="#/reservation">Settings</a>
-        <a href="/logout">Logout</a>
+    <!-- Sidebar Navigation -->
+<div class="col-md-2 col-sm-4 bg-dark text-white vh-100 p-1 sidebar">
+    <!-- Hotel Logo -->
+    <div class="text-center">
+        <img src="/static/assets/images/planetgelimgbulogo.png" alt="Hotel Logo" class="img-fluid mb-2" style="width: 150px;">
+    
     </div>
 
+    <!-- Navigation Links -->
+    <nav class="nav flex-column">
+        <a class="nav-link text-white py-2" href="/dashboard">
+            <i class="fas fa-tachometer-alt mr-2"></i>Dashboard
+        </a>
+        <a class="nav-link text-white py-2" href="/reservations">
+            <i class="fas fa-calendar-check mr-2"></i>Reservations
+        </a>
+        <a class="nav-link text-white py-2" href="/bookings">
+            <i class="fas fa-sign-in-alt mr-2"></i>Check In
+        </a>
+        <a class="nav-link text-white py-2" href="/rooms">
+            <i class="fas fa-door-closed mr-2"></i>Manage Rooms
+        </a>
+        <a class="nav-link text-white py-2" href="/housekeeping">
+            <i class="fas fa-broom mr-2"></i>Housekeeping
+        </a>
+        <a class="nav-link text-white py-2" href="/guests">
+            <i class="fas fa-users mr-2"></i>Guests
+        </a>
+        <a class="nav-link text-white py-2" href="/bookinghistory">
+            <i class="fas fa-history mr-2"></i>Check In History
+        </a>
+        <a class="nav-link text-white py-2" href="/logout">
+            <i class="fas fa-sign-out-alt mr-2"></i>Logout
+        </a>
+    </nav>
+</div>
     <!-- Main Content Area -->
     <div class="content">
     <div class="container">
