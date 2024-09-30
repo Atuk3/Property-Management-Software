@@ -344,12 +344,12 @@ def dashboard():
 @login_required
 def manage_reservations():
     # Filter reservations by status or guest name
-    status = request.args.get('status', '')
+    status = request.args.get('status', 'Reserved')  # Default to Reserved
     last_name = request.args.get('last_name', '')
 
     query = Reservation.query
     if status:
-        query = query.filter_by(status=status)
+        query = Reservation.query.filter_by(status='Reserved')
     if last_name:
         query = query.filter(Reservation.last_name.like(f'%{last_name}%'))
 
@@ -758,6 +758,11 @@ def check_in_reservation(reservation_id):
             )
             db.session.add(guest)
             db.session.commit()
+
+        # Update the reservation status to 'Checked In'
+        reservation.status = 'Checked In'
+
+        # Create a new booking with 'Checked In' status
         new_booking = Booking(
             guest_id=guest.id,
             first_name=form.first_name.data,

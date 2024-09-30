@@ -6,6 +6,7 @@
     <title>Manage Reservations</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <link rel="stylesheet" href="/static/css/dashboard.css" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
     <style>
         .container {
             max-width: 1200px;
@@ -66,14 +67,14 @@
             <div class="form-row">
             
                 <!-- Status Dropdown -->
-        <div class="form-group col-md-3">
+        <!-- <div class="form-group col-md-3">
             <label for="status">Status:</label>
             <select name="status" id="status" class="form-control">
                 <option value="">-- Select Status --</option>
                 <option value="Reserved" {% if status == 'Reserved' %}selected{% endif %}>Reserved</option>
                 <option value="Cancelled" {% if status == 'Cancelled' %}selected{% endif %}>Cancelled</option>
             </select>
-        </div>
+        </div> -->
                 <div class="form-group col-md-3">
                     <label for="last_name">Last Name:</label>
                     <input type="text" name="last_name" id="last_name" class="form-control" value="{{ last_name }}">
