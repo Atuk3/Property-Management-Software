@@ -598,8 +598,8 @@ def edit_room_status(room_id):
 @app.route('/bookings', methods=['GET'])
 def manage_bookings():
     
-    phone_number = request.args.get('phone_number')
-    last_name = request.args.get('last_name')
+    phone_number = request.args.get('phone_number','')
+    last_name = request.args.get('last_name','')
 
     bookings = Booking.query
 

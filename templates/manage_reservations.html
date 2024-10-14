@@ -66,15 +66,7 @@
         <form method="GET" action="{{ url_for('manage_reservations') }}" class="mb-4">
             <div class="form-row">
             
-                <!-- Status Dropdown -->
-        <!-- <div class="form-group col-md-3">
-            <label for="status">Status:</label>
-            <select name="status" id="status" class="form-control">
-                <option value="">-- Select Status --</option>
-                <option value="Reserved" {% if status == 'Reserved' %}selected{% endif %}>Reserved</option>
-                <option value="Cancelled" {% if status == 'Cancelled' %}selected{% endif %}>Cancelled</option>
-            </select>
-        </div> -->
+        
                 <div class="form-group col-md-3">
                     <label for="last_name">Last Name:</label>
                     <input type="text" name="last_name" id="last_name" class="form-control" value="{{ last_name }}">
