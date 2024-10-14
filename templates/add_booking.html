@@ -56,6 +56,14 @@
     <!-- Main Content Area -->
     <div class="content">
     <div class="container">
+        {% for field, errors in form.errors.items() %}
+    <div class="alert alert-danger">
+        <strong>{{ field.label.text }}:</strong>
+        {% for error in errors %}
+            <span>{{ error }}</span>
+        {% endfor %}
+    </div>
+{% endfor %}
         <h1 class="mb-4">Add Booking</h1>
         <form method="POST" action="{{ url_for('add_booking') }}">
             {{ form.hidden_tag() }}

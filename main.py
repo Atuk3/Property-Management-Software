@@ -3,7 +3,7 @@ import json
 import os
 import io
 import psycopg2
-from datetime import date
+from datetime import date, timedelta
 from flask import Flask,render_template, request, jsonify,flash,url_for,redirect,session,make_response
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
@@ -16,6 +16,8 @@ from flask_bcrypt import Bcrypt
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import login_user, login_required, logout_user, current_user,LoginManager
 from flask_migrate import Migrate
+# from flask import Flask
+# from flask_mail import Mail, Message
 
 # Initialize Flask application
 app=Flask(__name__)
@@ -27,11 +29,19 @@ app.config['SECRET_KEY']='david'
 app.config['UPLOAD_FOLDER']='static/files'
 app.config['SQLALCHEMY_DATABASE_URI']=f'sqlite:///{DB_NAME}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# Email server configuration
+# app.config['MAIL_SERVER'] = "smtp.googlemail.com"
+# app.config['MAIL_PORT'] = 587
+# app.config['MAIL_USERNAME'] = "planetgpinkissuites@gmail.com"
+# app.config['MAIL_PASSWORD'] = 'qjfzmdutgklkikby'
 db.init_app(app)
 bcrypt= Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 migrate=Migrate(app,db)
+
+ 
+
 #----------------------------------------------------------------
 #Database Creation
 class User(db.Model, UserMixin):
@@ -177,9 +187,10 @@ class ReservationForm(FlaskForm):
     phone_number = StringField('Phone Number', validators=[DataRequired()])
     email = StringField('Email', validators=[DataRequired()])
     status = SelectField('Status', choices=[('Reserved', 'Reserved'),('Cancelled', 'Cancelled')], validators=[DataRequired()])
-    total_amount = DecimalField('Total Amount (₦)', places=2, validators=[DataRequired(), NumberRange(min=0)], render_kw={'readonly': True})
+    total_amount = DecimalField('Total Amount (₦)', places=2, render_kw={'readonly': True})  # Remove validator
     submit = SubmitField('Save Reservation')
 
+    
     def calculate_total_price(self):
         # Calculate number of nights
         nights = (self.check_out_date.data - self.check_in_date.data).days
@@ -214,14 +225,22 @@ class BookingForm(FlaskForm):
     check_in_date = DateField('Check-in Date', format='%Y-%m-%d', validators=[DataRequired()])
     check_out_date = DateField('Check-out Date', format='%Y-%m-%d')
     status = SelectField('Status', choices=[('Pending', 'Pending')], validators=[DataRequired()])
-    total_amount = DecimalField('Total Amount (₦)', places=2, validators=[DataRequired(), NumberRange(min=0)], render_kw={'readonly': True})
+    total_amount = DecimalField('Total Amount (₦)', places=2, render_kw={'readonly': True})  # Remove validator
     
     submit = SubmitField('Submit')
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, readonly_room=False, *args, **kwargs):
         super(BookingForm, self).__init__(*args, **kwargs)
-        available_rooms = Room.query.filter_by(status='Available').all()
-        self.room_id.choices = [(room.id, f'Room {room.room_number} ({room.room_type}) - ₦{room.price}') for room in available_rooms]
+        if readonly_room:
+            # If room_id should be readonly, fetch the room and set its data
+            room = Room.query.get(kwargs.get('room_id'))
+            if room:
+                self.room_id.choices = [(room.id, f'Room {room.room_number} ({room.room_type}) - ₦{room.price}')]
+                self.room_id.render_kw = {'readonly': True}  # Make the room_id readonly
+        else:
+            # For regular bookings, populate available rooms as choices
+            available_rooms = Room.query.filter_by(status='Available').all()
+            self.room_id.choices = [(room.id, f'Room {room.room_number} ({room.room_type}) - ₦{room.price}') for room in available_rooms]
 
     def calculate_total_price(self):
         # Calculate number of nights
@@ -273,12 +292,29 @@ def login():
     return render_template('login.html', form=form)
 
 from datetime import date
-
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    # Fetch total bookings (checked in)
-    total_bookings = Booking.query.filter_by(status='Checked In').count()
+
+    # Get the current date
+    today = date.today()
+
+    # Fetch all reservations and dynamically update room statuses
+    reservations = Reservation.query.all()
+    for reservation in reservations:
+        room = Room.query.get(reservation.room_id)
+        # Only mark the room as reserved if the check-in date is today or during the reservation
+        if reservation.check_in_date <= today < reservation.check_out_date:
+            room.status = 'Reserved'
+        else:
+            room.status = 'Available'
+        db.session.commit()
+
+    # Fetch all bookings with status 'Checked In'
+    total_bookings = Booking.query.filter_by(status='Checked In').all()
+
+    # Calculate total number of adults and children in all checked-in bookings
+    total_people = sum([booking.adults_number + booking.children_number for booking in total_bookings])
 
     # Fetch total reservations (not yet checked in)
     total_reservations = Reservation.query.filter_by(status='Reserved').count()
@@ -289,7 +325,7 @@ def dashboard():
     # Fetch total available rooms
     total_rooms_available = Room.query.filter_by(status='Available').count()
 
-     # Fetch total available rooms and list them
+    # Fetch total available rooms and list them
     available_rooms = Room.query.filter_by(status='Available').all()
 
     # Fetch total dirty rooms
@@ -304,7 +340,7 @@ def dashboard():
     # Fetch guests departing today (check-out date is today and status is Checked In)
     guests_departing_today = Booking.query.filter_by(check_out_date=today, status='Checked In').all()
 
-    # Fetch total revenue for today (already provided earlier)
+    # Fetch total revenue for today
     active_bookings = Booking.query.filter(
         Booking.check_in_date <= today,
         Booking.check_out_date >= today
@@ -312,12 +348,17 @@ def dashboard():
 
     total_revenue_today = 0
     for booking in active_bookings:
+        # Calculate the number of nights
         number_of_nights = (booking.check_out_date - booking.check_in_date).days
-        if number_of_nights > 0:  # Avoid division by zero
+
+        # If guest is checking out today, count the full amount
+        if booking.check_out_date == today:
+            total_revenue_today += booking.total_amount
+        elif number_of_nights > 0:  # Avoid division by zero
             daily_rate = booking.total_amount / number_of_nights
             total_revenue_today += daily_rate
         else:
-            # Handle the case where number_of_nights is 0, if necessary
+            # Handle the case where number_of_nights is 0
             daily_rate = booking.total_amount  # Maybe assign the full amount if it's a single day stay
             total_revenue_today += daily_rate
 
@@ -325,8 +366,8 @@ def dashboard():
     recent_bookings = Booking.query.order_by(Booking.check_in_date.desc()).limit(5).all()
 
     return render_template(
-        'dashboard.html', 
-        total_bookings=total_bookings,
+        'dashboard.html', total_people=total_people,
+        total_bookings=len(total_bookings),  # Total count of checked-in bookings
         total_reservations=total_reservations,
         total_rooms_available=total_rooms_available,
         total_rooms_dirty=total_rooms_dirty,
@@ -381,12 +422,12 @@ def add_reservation():
             check_out_date=form.check_out_date.data,
             room_id=form.room_id.data,
             total_amount=form.calculate_total_price(),
-            status=form.status.data
+            status='Reserved'
         )
-        
+        # Do not mark the room as Reserved immediately, it will be handled dynamically
         # Mark the room as "Occupied"
-        room = Room.query.get(form.room_id.data)
-        room.status = 'Reserved'
+        # room = Room.query.get(form.room_id.data)
+        # room.status = 'Reserved'
 
         # Commit changes
         db.session.add(new_reservation)
@@ -450,6 +491,21 @@ def logout():
 @app.route('/rooms', methods=['GET', 'POST'])
 @login_required
 def manage_rooms():
+
+    today = date.today()
+    # Update room statuses dynamically based on the reservation date
+    reservations = Reservation.query.filter(Reservation.check_in_date >= today).all()
+    for reservation in reservations:
+        room = Room.query.get(reservation.room_id)
+
+        # Check if the room is reserved for today or available
+        if reservation.check_in_date <= today < reservation.check_out_date:
+            room.status = 'Reserved'  # Reserved for today
+        else:
+            room.status = 'Available'  # Available until the reserved date
+
+        db.session.commit()
+
     # Handle filtering
     room_type = request.args.get('room_type', '')
     status = request.args.get('status', '')
@@ -564,7 +620,7 @@ def manage_bookings():
 def add_booking():
     form = BookingForm()
     # Fetch rooms that are either "Available" or "Reserved"
-    available_rooms = Room.query.filter(Room.status.in_(['Available', 'Reserved'])).all()
+    available_rooms = Room.query.filter(Room.status.in_(['Available'])).all()
 
  # Populate the room choices in the form
     form.room_id.choices = [(room.id, f'Room {room.room_number} - {room.room_type} (₦{room.price})') for room in available_rooms]
@@ -723,25 +779,21 @@ def check_in_reservation(reservation_id):
     # Fetch the reservation by ID
     reservation = Reservation.query.get_or_404(reservation_id)
 
-     # Dynamically populate available room choices (including the reserved room)
-    available_rooms = Room.query.filter(Room.status.in_(['Available', 'Reserved'])).all()
-
-
     # Pre-fill the BookingForm with the reservation details
     form = BookingForm(
+        readonly_room=True,
         first_name=reservation.first_name,
         last_name=reservation.last_name,
         phone_number=reservation.phone_number,
         email=reservation.email,
-        room_id=reservation.room_id,
+        room_id=reservation.room_id,  # Prefill room_id
         check_in_date=reservation.check_in_date,
         check_out_date=reservation.check_out_date,
         total_amount=reservation.total_amount
     )
 
-      # Set the room choices in the form, making sure the reserved room is included
-    form.room_id.choices = [(room.id, f'Room {room.room_number} - {room.room_type} (₦{room.price})') for room in available_rooms]
-
+    # Hide the room_id field by making it a hidden input field
+    form.room_id.render_kw = {'readonly': True, 'type': 'hidden'}
 
     # If the form is submitted, save the booking and mark the room as occupied
     if form.validate_on_submit():
@@ -769,14 +821,15 @@ def check_in_reservation(reservation_id):
             last_name=form.last_name.data,
             phone_number=form.phone_number.data,
             email=form.email.data,
-            room_id=form.room_id.data,
+            room_id=reservation.room_id,  # Use the prefixed room_id from the reservation
             check_in_date=form.check_in_date.data,
             check_out_date=form.check_out_date.data,
             status='Checked In',
             total_amount=reservation.total_amount  # Use the same total amount from reservation
         )
 
-        room = Room.query.get(form.room_id.data)
+        # Update the room status to 'Occupied'
+        room = Room.query.get(reservation.room_id)
         room.status = 'Occupied'
 
         db.session.add(new_booking)
