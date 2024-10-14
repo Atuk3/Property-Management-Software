@@ -3,7 +3,7 @@ import json
 import os
 import io
 import psycopg2
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from flask import Flask,render_template, request, jsonify,flash,url_for,redirect,session,make_response
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
@@ -779,6 +779,15 @@ def check_in_reservation(reservation_id):
     # Fetch the reservation by ID
     reservation = Reservation.query.get_or_404(reservation_id)
 
+    # Get today's date (without time)
+    today = datetime.utcnow().date()
+
+    # Check if the check-in date is today
+    if reservation.check_in_date != today:
+        flash(f'Check-in date for this reservation is {reservation.check_in_date}. You can only check in on the correct date.', 'danger')
+        
+        return redirect(url_for('manage_reservations'))  # Redirect back to reservations list
+
     # Pre-fill the BookingForm with the reservation details
     form = BookingForm(
         readonly_room=True,
@@ -793,7 +802,7 @@ def check_in_reservation(reservation_id):
     )
 
     # Hide the room_id field by making it a hidden input field
-    form.room_id.render_kw = {'readonly': True, 'type': 'hidden'}
+    form.room_id.render_kw = {'readonly': True}
 
     # If the form is submitted, save the booking and mark the room as occupied
     if form.validate_on_submit():
@@ -827,6 +836,7 @@ def check_in_reservation(reservation_id):
             status='Checked In',
             total_amount=reservation.total_amount  # Use the same total amount from reservation
         )
+       
 
         # Update the room status to 'Occupied'
         room = Room.query.get(reservation.room_id)

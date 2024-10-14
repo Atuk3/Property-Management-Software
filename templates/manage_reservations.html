@@ -62,6 +62,21 @@
     <div class="content">
     
         <h1 class="mb-4">Manage Reservations</h1>
+           <!-- Flash message display block -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        <div class="alert-container">
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+{% endwith %}
         
         <form method="GET" action="{{ url_for('manage_reservations') }}" class="mb-4">
             <div class="form-row">
