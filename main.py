@@ -60,7 +60,7 @@ class Reservation(db.Model):
     check_out_date = db.Column(db.Date, nullable=False)
     room_id = db.Column(db.Integer, db.ForeignKey('room.id'), nullable=False)
     total_amount = db.Column(db.Float, nullable=False)
-    status = db.Column(db.String(20), nullable=False, default='Reserved') #Reserved, Cancelled.
+    status = db.Column(db.String(20), nullable=False, default='Reserved') 
 
 
     def calculate_total_amount(self):
@@ -191,7 +191,7 @@ class ReservationForm(FlaskForm):
     room_id = SelectField('Room', coerce=int, validators=[DataRequired()])
     phone_number = StringField('Phone Number', validators=[DataRequired()])
     email = StringField('Email', validators=[DataRequired()])
-    status = SelectField('Status', choices=[('Reserved', 'Reserved'),('Cancelled', 'Cancelled')], validators=[DataRequired()])
+    status = SelectField('Status', choices=[('Reserved', 'Reserved')], validators=[DataRequired()])
     total_amount = DecimalField('Total Amount (₦)', places=2, render_kw={'readonly': True})  # Remove validator
     submit = SubmitField('Save Reservation')
 
@@ -306,14 +306,7 @@ def dashboard():
 
     # Fetch all reservations and dynamically update room statuses
     reservations = Reservation.query.all()
-    # for reservation in reservations:
-    #     room = Room.query.get(reservation.room_id)
-    #     # Only mark the room as reserved if the check-in date is today or during the reservation
-    #     if reservation.check_in_date <= today < reservation.check_out_date:
-    #         room.status = 'Reserved'
-    #     else:
-    #         room.status = 'Dirty'
-    #     db.session.commit()
+    
 
     # Fetch all bookings with status 'Checked In'
     total_bookings = Booking.query.filter_by(status='Checked In').all()
@@ -393,9 +386,10 @@ def manage_reservations():
     status = request.args.get('status', 'Reserved')  # Default to Reserved
     last_name = request.args.get('last_name', '')
 
-    query = Reservation.query
-    if status:
-        query = Reservation.query.filter_by(status='Reserved')
+    # Start with the base query
+    query = Reservation.query.filter(Reservation.status == 'Reserved')  # Filter for 'Reserved' status
+
+
     if last_name:
         query = query.filter(Reservation.last_name.like(f'%{last_name}%'))
 
@@ -447,7 +441,7 @@ def add_reservation():
             check_out_date=check_out,
             room_id=room_id,
             total_amount=form.calculate_total_price(),
-            status='Reserved'
+            status=form.status
         )
 
         # Commit changes
@@ -514,20 +508,6 @@ def logout():
 @login_required
 def manage_rooms():
 
-    today = date.today()
-    # Update room statuses dynamically based on the reservation date
-    reservations = Reservation.query.filter(Reservation.check_in_date >= today).all()
-    for reservation in reservations:
-        room = Room.query.get(reservation.room_id)
-
-        # Check if the room is reserved for today or available
-        if reservation.check_in_date <= today < reservation.check_out_date:
-            room.status = 'Reserved'  # Reserved for today
-        else:
-            room.status = 'Available'  # Available until the reserved date
-
-        db.session.commit()
-
     # Handle filtering
     room_type = request.args.get('room_type', '')
     status = request.args.get('status', '')
@@ -590,7 +570,8 @@ def mark_room_clean(room_id):
     if room.status == 'Dirty':
         room.status = 'Available'
         db.session.commit()
-        flash('Room is now available.', 'success')
+        flash(f'Room {room.room_number} is now available.', 'success')
+        
     return redirect(url_for('housekeeping'))
 
 @app.route('/housekeeping', methods=['GET'])
@@ -641,7 +622,7 @@ def manage_bookings():
 @app.route('/bookings/add', methods=['GET', 'POST'])
 def add_booking():
     form = BookingForm()
-    # Fetch rooms that are either "Available" or "Reserved"
+    # Fetch rooms that are either "Available" 
     available_rooms = Room.query.filter(Room.status.in_(['Available'])).all()
 
  # Populate the room choices in the form
@@ -697,15 +678,10 @@ def add_booking():
             total_amount=form.total_amount.data
         )
 
-        # room = Room.query.get(form.room_id.data)
-        # if room:
-        #     room.status = 'Occupied'  # Update room status to 'occupied'
-
-  # Fetch the reservation linked to this booking (if exists) and update its status
+    # Fetch the reservation linked to this booking (if exists) and update its status
         reservation = Reservation.query.filter_by(room_id=form.room_id.data).first()
         if reservation:
-            reservation.status = 'Checked In'  # Update reservation status to 'Checked In'
-
+            reservation.status = 'Checked In'  # Update reservation status to 'Checked In
             
         db.session.add(new_booking)
         db.session.commit()
@@ -769,12 +745,6 @@ def check_in(booking_id):
         room.status = 'Occupied'  # Update room status to Occupied
         db.session.commit()  # Ensure the change is committed
 
-     # Fetch the reservation tied to the booking's room, if any
-    reservation = Reservation.query.filter_by(room_id=booking.room_id).first()
-    if reservation and reservation.status == 'Reserved':
-        reservation.status = 'Checked In'  # Update reservation status to Checked In
-        db.session.commit()  # Ensure the change is committed
-
     db.session.commit()
 
    
@@ -813,6 +783,14 @@ def bookinghistory():
 def check_in_reservation(reservation_id):
     # Fetch the reservation by ID
     reservation = Reservation.query.get_or_404(reservation_id)
+    reservation.status = 'Checked In'
+    
+
+     # Change the reserved room status to 'Available'
+    reserved_room = Room.query.get(reservation.room_id)
+    if reserved_room.status == 'Reserved':
+        reserved_room.status = 'Available'
+        db.session.commit()  # Commit the status change to make the room available for selection
 
     # Get today's date (without time)
     today = datetime.utcnow().date()
@@ -855,8 +833,7 @@ def check_in_reservation(reservation_id):
             db.session.add(guest)
             db.session.commit()
 
-        # Update the reservation status to 'Checked In'
-        reservation.status = 'Checked In'
+        
 
         # Create a new booking with 'Checked In' status
         new_booking = Booking(
@@ -877,6 +854,11 @@ def check_in_reservation(reservation_id):
         room = Room.query.get(reservation.room_id)
         room.status = 'Occupied'
 
+        # Update the reservation status to 'Checked In'
+        reservation.status = 'Checked In'
+
+       
+    
         db.session.add(new_booking)
         db.session.commit()
         flash('Guest successfully checked in!', 'success')
