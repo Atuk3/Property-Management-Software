@@ -387,7 +387,7 @@ def manage_reservations():
     last_name = request.args.get('last_name', '')
 
     # Start with the base query
-    query = Reservation.query.filter(Reservation.status == 'Reserved')  # Filter for 'Reserved' status
+    query = Reservation.query.filter(Reservation.status =='Reserved')  # Filter for 'Reserved' status
 
 
     if last_name:
@@ -407,7 +407,7 @@ def add_reservation():
     form = ReservationForm()
 
     # Dynamically populate available room choices
-    available_rooms = Room.query.filter_by(status='Available').all()
+    available_rooms = Room.query.filter(Room.status.in_(['Available', 'Occupied'])).all()
     form.room_id.choices = [(room.id, f'Room {room.room_number} - {room.room_type} (₦{room.price})') for room in available_rooms]
 
     if form.validate_on_submit():
@@ -418,7 +418,7 @@ def add_reservation():
         
         # Check for existing reservations that overlap with the requested dates
         conflicting_reservation = Reservation.query.filter(
-            Reservation.room_id == room_id,
+            Reservation.room_id == room_id, Reservation.status != 'Checked Out',
             (Reservation.check_in_date < check_out) & (Reservation.check_out_date > check_in)
         ).first()
 
@@ -441,7 +441,7 @@ def add_reservation():
             check_out_date=check_out,
             room_id=room_id,
             total_amount=form.calculate_total_price(),
-            status=form.status
+            status=form.status.data
         )
 
         # Commit changes
@@ -680,6 +680,8 @@ def add_booking():
 
     # Fetch the reservation linked to this booking (if exists) and update its status
         reservation = Reservation.query.filter_by(room_id=form.room_id.data).first()
+         # Log the selected room ID to the console
+        print(f'Room ID selected for booking: {form.room_id.data}')
         if reservation:
             reservation.status = 'Checked In'  # Update reservation status to 'Checked In
             
@@ -756,6 +758,12 @@ def check_out(booking_id):
     booking.status = 'Checked Out'
     room = Room.query.get(booking.room_id)
     room.status = 'Dirty' # Mark room as dirty after checkout
+# Fetch the reservation linked to this booking (if it exists)
+    reservation = Reservation.query.filter_by(room_id=booking.room_id).first()
+    
+    if reservation:
+        # Update reservation status to 'Checked Out'
+        reservation.status = 'Checked Out'
     booking.check_out_date = date.today()  # Automatically set the check-out date
     db.session.commit()
     return redirect(url_for('manage_bookings'))
