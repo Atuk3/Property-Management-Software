@@ -700,9 +700,9 @@ def add_booking():
             (Reservation.check_out_date > check_in)
         ).first()
 
-        if conflicting_reservation:
-            flash('The selected room is already reserved for the chosen dates. Please choose a different room or date range.', 'danger')
-            return render_template('add_booking.html', form=form)
+        # if conflicting_reservation:
+        #     flash('The selected room is already reserved for the chosen dates. Please choose a different room or date range.', 'danger')
+        #     return render_template('add_booking.html', form=form)
 
         # Proceed with the booking if no conflicts
         guest = Guest.query.filter_by(email=form.email.data).first()
