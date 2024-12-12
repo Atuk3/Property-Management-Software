@@ -151,8 +151,8 @@ class Guest(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     first_name = db.Column(db.String(100), nullable=False)
     last_name = db.Column(db.String(100), nullable=False)
-    phone_number = db.Column(db.String(20), nullable=False)
-    email = db.Column(db.String(120), nullable=False, unique=True)
+    phone_number = db.Column(db.String(20), nullable=False, unique=True)  # Ensure phone number is unique
+    email = db.Column(db.String(120), nullable=False, unique=True)  # Email remains unique
     address = db.Column(db.String(200), nullable=False)
     id_type = db.Column(db.String(50), nullable=False)
     id_number = db.Column(db.String(50), nullable=False)
@@ -220,7 +220,7 @@ class BookingForm(FlaskForm):
     first_name = StringField('First Name', validators=[DataRequired()])
     last_name = StringField('Last Name', validators=[DataRequired()])
     room_id = SelectField('Room', coerce=int, validators=[DataRequired()])
-    phone_number = StringField('Phone Number', validators=[DataRequired()])
+    phone_number = StringField('Phone Number', validators=[DataRequired(), Length(min=11)])
     email = StringField('Email', validators=[DataRequired()])
     address = StringField('Address', validators=[DataRequired()])
     id_type = SelectField('ID Type', choices=[('nin', 'NIN'), ('drivers_license', 'Driver\'s License'), ('id_card', 'ID Card')], validators=[DataRequired()])
@@ -234,6 +234,7 @@ class BookingForm(FlaskForm):
     
     submit = SubmitField('Submit')
 
+    
     def __init__(self, readonly_room=False, *args, **kwargs):
         super(BookingForm, self).__init__(*args, **kwargs)
         if readonly_room:
@@ -406,32 +407,39 @@ def manage_reservations():
 def add_reservation():
     form = ReservationForm()
 
-    # Dynamically populate available room choices
-    available_rooms = Room.query.filter(Room.status.in_(['Available', 'Occupied'])).all()
-    form.room_id.choices = [(room.id, f'Room {room.room_number} - {room.room_type} (₦{room.price})') for room in available_rooms]
+    # Initially display all rooms except those under maintenance
+    all_rooms = Room.query.filter(Room.status != 'Maintenance').all()
+    form.room_id.choices = [
+        (room.id, f'Room {room.room_number} - {room.room_type} (₦{room.price})') 
+        for room in all_rooms
+    ]
 
+    # Handle form submission
     if form.validate_on_submit():
-        # Retrieve the selected room ID and the new reservation dates
-        room_id = form.room_id.data
         check_in = form.check_in_date.data
         check_out = form.check_out_date.data
-        
-        # Check for existing reservations that overlap with the requested dates
+
+        # Check for room availability before submission
+        room_id = form.room_id.data
         conflicting_reservation = Reservation.query.filter(
-            Reservation.room_id == room_id, Reservation.status != 'Checked Out',
-            (Reservation.check_in_date < check_out) & (Reservation.check_out_date > check_in)
+            Reservation.room_id == room_id,
+            Reservation.status != 'Checked Out',
+            (Reservation.check_in_date < check_out) & 
+            (Reservation.check_out_date > check_in)
         ).first()
 
-       # If there's a conflict, flash a message and redirect
-        if conflicting_reservation:
-            # Extract the existing reservation's dates for the message
-            existing_check_in = conflicting_reservation.check_in_date.strftime('%Y-%m-%d')
-            existing_check_out = conflicting_reservation.check_out_date.strftime('%Y-%m-%d')
-            flash(f'The room is already booked from {existing_check_in} to {existing_check_out}. Please choose different dates.', 'danger')
-             # Return the form with previously entered data
+        conflicting_booking = Booking.query.filter(
+            Booking.room_id == room_id,
+            Booking.status == 'Checked In',
+            (Booking.check_in_date < check_out) & 
+            (Booking.check_out_date > check_in)
+        ).first()
+
+        if conflicting_reservation or conflicting_booking:
+            flash('The selected room is unavailable for the chosen dates. Please choose a different room or date range.', 'danger')
             return render_template('add_reservation.html', form=form)
 
-        # Create a new reservation if no conflict is found
+        # Proceed to create the reservation if no conflicts
         new_reservation = Reservation(
             first_name=form.first_name.data,
             last_name=form.last_name.data,
@@ -444,13 +452,61 @@ def add_reservation():
             status=form.status.data
         )
 
-        # Commit changes
         db.session.add(new_reservation)
         db.session.commit()
         flash('Reservation successfully created!', 'success')
         return redirect(url_for('manage_reservations'))
 
     return render_template('add_reservation.html', form=form)
+
+
+
+@app.route('/rooms/filter', methods=['GET'])
+def filter_rooms():
+    check_in_date = request.args.get('check_in_date', None)
+    check_out_date = request.args.get('check_out_date', None)
+
+    if check_in_date and check_out_date:
+        check_in = datetime.strptime(check_in_date, '%Y-%m-%d')
+        check_out = datetime.strptime(check_out_date, '%Y-%m-%d')
+
+        # Exclude rooms with overlapping bookings or reservations
+        unavailable_room_ids = db.session.query(Room.id).filter(
+            Room.id.in_(
+                db.session.query(Reservation.room_id).filter(
+                    (Reservation.check_in_date < check_out) & 
+                    (Reservation.check_out_date > check_in) & 
+                    (Reservation.status != 'Checked Out')
+                ).union(
+                    db.session.query(Booking.room_id).filter(
+                        (Booking.check_in_date < check_out) & 
+                        (Booking.check_out_date > check_in) & 
+                        (Booking.status == 'Checked In')
+                    )
+                )
+            )
+        ).all()
+
+        # Flatten unavailable room IDs
+        unavailable_room_ids = [room_id[0] for room_id in unavailable_room_ids]
+
+        # Get available rooms
+        available_rooms = Room.query.filter(
+            Room.status != 'Maintenance',
+            ~Room.id.in_(unavailable_room_ids)
+        ).all()
+
+        return jsonify({
+            'rooms': [
+                {'id': room.id, 'room_number': room.room_number, 
+                 'room_type': room.room_type, 'price': room.price}
+                for room in available_rooms
+            ]
+        })
+
+    return jsonify({'rooms': []})
+
+
 
 
 
@@ -632,11 +688,26 @@ def add_booking():
     form.check_in_date.data = date.today()
 
     if form.validate_on_submit():
-         # Check if the guest already exists based on email or other identifier
+        check_in = form.check_in_date.data
+        check_out = form.check_out_date.data
+        room_id = form.room_id.data
+
+        # Validate if the selected room is still available for the dates
+        conflicting_reservation = Reservation.query.filter(
+            Reservation.room_id == room_id,
+            Reservation.status != 'Checked Out',
+            (Reservation.check_in_date < check_out) &
+            (Reservation.check_out_date > check_in)
+        ).first()
+
+        if conflicting_reservation:
+            flash('The selected room is already reserved for the chosen dates. Please choose a different room or date range.', 'danger')
+            return render_template('add_booking.html', form=form)
+
+        # Proceed with the booking if no conflicts
         guest = Guest.query.filter_by(email=form.email.data).first()
-        
         if guest is None:
-            # Create a new guest
+            # Create a new guest if not already in the database
             guest = Guest(
                 first_name=form.first_name.data,
                 last_name=form.last_name.data,
@@ -648,20 +719,10 @@ def add_booking():
             )
             db.session.add(guest)
             db.session.commit()
-        else:
-            # Update existing guest details
-            guest.first_name = form.first_name.data
-            guest.last_name = form.last_name.data
-            guest.phone_number = form.phone_number.data
-            guest.address = form.address.data
-            guest.id_type = form.id_type.data
-            guest.id_number = form.id_number.data
-            db.session.commit()
 
-
-        # Create the booking
+        # Create the new booking
         new_booking = Booking(
-            guest_id=guest.id,  # Link the guest to the booking
+            guest_id=guest.id,
             first_name=form.first_name.data,
             last_name=form.last_name.data,
             phone_number=form.phone_number.data,
@@ -669,27 +730,81 @@ def add_booking():
             address=form.address.data,
             id_type=form.id_type.data,
             id_number=form.id_number.data,
-            room_id=form.room_id.data,
+            room_id=room_id,
             children_number=form.children_number.data,
             adults_number=form.adults_number.data,
             status=form.status.data,
-            check_in_date=date.today(),  # Set check-in date to today
-            check_out_date=form.check_out_date.data,
+            check_in_date=check_in,
+            check_out_date=check_out,
             total_amount=form.total_amount.data
         )
 
-    # Fetch the reservation linked to this booking (if exists) and update its status
-        reservation = Reservation.query.filter_by(room_id=form.room_id.data).first()
-         # Log the selected room ID to the console
-        print(f'Room ID selected for booking: {form.room_id.data}')
+        # Update reservation status if linked
+        reservation = Reservation.query.filter_by(room_id=room_id).first()
         if reservation:
-            reservation.status = 'Checked In'  # Update reservation status to 'Checked In
-            
+            reservation.status = 'Checked In'
+
         db.session.add(new_booking)
         db.session.commit()
         flash('Booking added successfully!', 'success')
         return redirect(url_for('manage_bookings'))
+
     return render_template('add_booking.html', form=form)
+
+@app.route('/rooms/filter_for_booking', methods=['GET'])
+def filter_rooms_for_booking():
+    check_in_date = request.args.get('check_in_date')
+    check_out_date = request.args.get('check_out_date')
+
+    if check_in_date and check_out_date:
+        check_in = datetime.strptime(check_in_date, '%Y-%m-%d')
+        check_out = datetime.strptime(check_out_date, '%Y-%m-%d')
+
+        # Exclude rooms with conflicting reservations
+        unavailable_room_ids = db.session.query(Room.id).filter(
+            Room.id.in_(
+                db.session.query(Reservation.room_id).filter(
+                    (Reservation.check_in_date < check_out) &
+                    (Reservation.check_out_date > check_in) &
+                    (Reservation.status != 'Checked Out')
+                )
+            )
+        ).all()
+
+        unavailable_room_ids = [room_id[0] for room_id in unavailable_room_ids]
+
+        # Fetch available rooms excluding those with conflicts
+        
+        available_rooms = Room.query.filter(Room.status.in_(['Available']),
+            ~Room.id.in_(unavailable_room_ids)
+        ).all()
+
+        return jsonify({
+            'rooms': [
+                {'id': room.id, 'room_number': room.room_number, 
+                 'room_type': room.room_type, 'price': room.price}
+                for room in available_rooms
+            ]
+        })
+
+    return jsonify({'rooms': []})
+
+@app.route('/guests/get_by_phone', methods=['GET'])
+def get_guest_by_phone():
+    phone_number = request.args.get('phone_number', None)
+    if phone_number:
+        guest = Guest.query.filter_by(phone_number=phone_number).first()
+        if guest:
+            return jsonify({
+                'exists': True,
+                'first_name': guest.first_name,
+                'last_name': guest.last_name,
+                'email': guest.email,
+                'address': guest.address,
+                'id_type': guest.id_type,
+                'id_number': guest.id_number
+            })
+    return jsonify({'exists': False})
 
 @app.route('/bookings/edit/<int:booking_id>', methods=['GET', 'POST'])
 def edit_booking(booking_id):

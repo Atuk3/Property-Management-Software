@@ -78,22 +78,10 @@
         <form method="POST" action="{{ url_for('add_reservation') }}">
             {{ form.hidden_tag() }}
             <div class="form-group">
-                {{ form.first_name.label(class="form-label") }}
-                {{ form.first_name(class="form-control") }}
-            </div>
-            <div class="form-group">
-                {{ form.last_name.label(class="form-label") }}
-                {{ form.last_name(class="form-control") }}
-            </div>
-            <div class="form-group">
                 {{ form.phone_number.label(class="form-label") }}
-                {{ form.phone_number(class="form-control") }}
+                {{ form.phone_number(class="form-control", id="phone_number") }}
+                <small id="phoneHelp" class="form-text text-muted">Check if the customer already exists.</small>
             </div>
-            <div class="form-group">
-                {{ form.email.label(class="form-label") }}
-                {{ form.email(class="form-control") }}
-            </div>
-        
             <div class="form-group">
                 {{ form.check_in_date.label(class="form-label") }}
                 {{ form.check_in_date(class="form-control") }}
@@ -102,6 +90,20 @@
                 {{ form.check_out_date.label(class="form-label") }}
                 {{ form.check_out_date(class="form-control") }}
             </div>
+            <div class="form-group">
+                {{ form.first_name.label(class="form-label") }}
+                {{ form.first_name(class="form-control", id="first_name") }}
+            </div>
+            <div class="form-group">
+                {{ form.last_name.label(class="form-label") }}
+                {{ form.last_name(class="form-control", id="last_name") }}
+            </div>
+            <div class="form-group">
+                {{ form.email.label(class="form-label") }}
+                {{ form.email(class="form-control", id="email") }}
+            </div>
+        
+           
             <div class="form-group">
                 {{ form.room_id.label(class="form-label") }}
                 {{ form.room_id(class="form-control") }}
@@ -123,6 +125,63 @@
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.1/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script src="{{ url_for('static', filename='javascript/booking.js') }}"></script>
+    <script>
+        document.getElementById('phone_number').addEventListener('blur', function () {
+            const phoneNumber = this.value;
+            if (phoneNumber) {
+                fetch(`/guests/get_by_phone?phone_number=${encodeURIComponent(phoneNumber)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.exists) {
+                            document.getElementById('first_name').value = data.first_name || '';
+                            document.getElementById('last_name').value = data.last_name || '';
+                            document.getElementById('email').value = data.email || '';
+                           
+                           
+                        } else {
+                            alert('No guest found with this phone number.');
+                        }
+                    })
+                    .catch(error => console.error('Error fetching guest details:', error));
+            }
+        });
+    </script>
+   
+    <script>
+        // Attach event listeners to the check-in and check-out date fields
+        document.getElementById('check_in_date').addEventListener('change', filterRooms);
+        document.getElementById('check_out_date').addEventListener('change', filterRooms);
+    
+        function filterRooms() {
+            const checkInDate = document.getElementById('check_in_date').value;
+            const checkOutDate = document.getElementById('check_out_date').value;
+    
+            if (checkInDate && checkOutDate) {
+                // Fetch available rooms based on the selected dates
+                fetch(`/rooms/filter?check_in_date=${encodeURIComponent(checkInDate)}&check_out_date=${encodeURIComponent(checkOutDate)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const roomSelect = document.getElementById('room_id');
+                        roomSelect.innerHTML = ''; // Clear current options
+    
+                        if (data.rooms && data.rooms.length > 0) {
+                            data.rooms.forEach(room => {
+                                const option = document.createElement('option');
+                                option.value = room.id;
+                                option.textContent = `Room ${room.room_number} - ${room.room_type} (₦${room.price})`;
+                                roomSelect.appendChild(option);
+                            });
+                        } else {
+                            const option = document.createElement('option');
+                            option.textContent = 'No rooms available for the selected dates';
+                            option.disabled = true;
+                            roomSelect.appendChild(option);
+                        }
+                    })
+                    .catch(error => console.error('Error fetching available rooms:', error));
+            }
+        }
+    </script>
     
 
 </body>
