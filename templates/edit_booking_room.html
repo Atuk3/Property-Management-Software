@@ -55,7 +55,7 @@
     <!-- Main Content Area -->
     <div class="content">
     <div class="container">
-        <h1 class="mb-4">Edit Booking</h1>
+        <h1 class="mb-4">Change Room</h1>
            <!-- Flash message display block -->
     {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
@@ -71,7 +71,7 @@
         </div>
     {% endif %}
 {% endwith %}
-        <form method="POST" action="{{ url_for('edit_booking', booking_id=booking.id) }}">
+        <form method="POST" action="{{ url_for('edit_booking_room', booking_id=booking.id) }}">
             {{ form.hidden_tag() }}
             <div class="form-group">
                 {{ form.check_in_date.label(class="form-label") }}
@@ -92,11 +92,7 @@
                 {{ form.last_name.label(class="form-label") }}
                 {{ form.last_name(class="form-control") }}
             </div>
-           <!-- Room Details (Room is pre-filled and locked) -->
-            <!-- <div class="form-group">
-                {{ form.room_id.label(class="form-label") }}
-                {{ form.room_id(class="form-control", readonly=True, disabled=True) }}
-            </div> -->
+          
            
             <div class="form-group">
                 {{ form.phone_number.label(class="form-label") }}
@@ -147,33 +143,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.1/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script src="{{ url_for('static', filename='javascript/booking.js') }}"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const checkOutDateInput = document.getElementById('check_out_date');
-            const roomSelect = document.getElementById('room_id');
-            const checkInDateInput = document.getElementById('check_in_date');
-    
-            checkOutDateInput.addEventListener('change', function () {
-                const roomId = roomSelect.value;
-                const checkInDate = checkInDateInput.value;
-                const checkOutDate = checkOutDateInput.value;
-    
-                if (roomId && checkInDate && checkOutDate) {
-                    // Make an API call to check for conflicts
-                    fetch(`/bookings/check_conflict?room_id=${roomId}&check_in_date=${checkInDate}&check_out_date=${checkOutDate}`)
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.conflict) {
-                                alert(data.message); // Alert the user about the conflict
-                                checkOutDateInput.value = ''; // Reset the checkout date
-                            }
-                        })
-                        .catch(error => console.error('Error checking conflict:', error));
-                }
-            });
-        });
-    </script>
-    <!-- <script>
+     <!-- <script>
         document.getElementById('check_in_date').addEventListener('change', filterRooms);
         document.getElementById('check_out_date').addEventListener('change', filterRooms);
     

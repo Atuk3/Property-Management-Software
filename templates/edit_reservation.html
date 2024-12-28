@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Edit Booking</title>
+    <title>Edit Reservation</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <link rel="stylesheet" href="/static/css/dashboard.css" />
     <style>
@@ -54,9 +54,23 @@
     <!-- Main Content Area -->
     <div class="content">
     <div class="container">
-        <h1 class="mb-4">Edit Booking</h1>
+        <h1 class="mb-4">Edit Reservation</h1>
         <form method="POST" action="{{ url_for('edit_reservation', reservation_id=reservation.id) }}">
             {{ form.hidden_tag() }}
+
+            <div class="form-group">
+                {{ form.check_in_date.label(class="form-label") }}
+                {{ form.check_in_date(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ form.check_out_date.label(class="form-label") }}
+                {{ form.check_out_date(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ form.room_id.label(class="form-label") }}
+                {{ form.room_id(class="form-control", id="room_id") }}
+            </div>
+            
             <div class="form-group">
                 {{ form.first_name.label(class="form-label") }}
                 {{ form.first_name(class="form-control") }}
@@ -65,10 +79,7 @@
                 {{ form.last_name.label(class="form-label") }}
                 {{ form.last_name(class="form-control") }}
             </div>
-            <div class="form-group">
-                {{ form.room_id.label(class="form-label") }}
-                {{ form.room_id(class="form-control") }}
-            </div>
+           
             <div class="form-group">
                 {{ form.phone_number.label(class="form-label") }}
                 {{ form.phone_number(class="form-control") }}
@@ -78,15 +89,7 @@
                 {{ form.email(class="form-control") }}
             </div>
            
-            <div class="form-group">
-                {{ form.check_in_date.label(class="form-label") }}
-                {{ form.check_in_date(class="form-control") }}
-            </div>
-            <div class="form-group">
-                {{ form.check_out_date.label(class="form-label") }}
-                {{ form.check_out_date(class="form-control") }}
-            </div>
-            
+           
             <div class="form-group">
                 {{ form.total_amount.label(class="form-label") }}
                 {{ form.total_amount(class="form-control") }}
@@ -100,5 +103,40 @@
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.1/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="{{ url_for('static', filename='javascript/booking.js') }}"></script>
+    <script>
+        document.getElementById('check_in_date').addEventListener('change', filterRooms);
+        document.getElementById('check_out_date').addEventListener('change', filterRooms);
+    
+        function filterRooms() {
+            const checkInDate = document.getElementById('check_in_date').value;
+            const checkOutDate = document.getElementById('check_out_date').value;
+    
+            if (checkInDate && checkOutDate) {
+                fetch(`/rooms/filter_for_booking?check_in_date=${encodeURIComponent(checkInDate)}&check_out_date=${encodeURIComponent(checkOutDate)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const roomSelect = document.getElementById('room_id');
+                        roomSelect.innerHTML = ''; // Clear existing options
+    
+                        if (data.rooms && data.rooms.length > 0) {
+                            data.rooms.forEach(room => {
+                                const option = document.createElement('option');
+                                option.value = room.id;
+                                option.textContent = `Room ${room.room_number} - ${room.room_type} (₦${room.price})`;
+                                roomSelect.appendChild(option);
+                            });
+                        } else {
+                            const option = document.createElement('option');
+                            option.textContent = 'No rooms available for the selected dates';
+                            option.disabled = true;
+                            roomSelect.appendChild(option);
+                        }
+                    })
+                    .catch(error => console.error('Error fetching available rooms:', error));
+            }
+        }
+    </script>
+
 </body>
 </html>

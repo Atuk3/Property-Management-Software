@@ -755,18 +755,26 @@ def add_booking():
 def filter_rooms_for_booking():
     check_in_date = request.args.get('check_in_date')
     check_out_date = request.args.get('check_out_date')
+    current_booking_id = request.args.get('current_booking_id', type=int)  # New parameter
 
     if check_in_date and check_out_date:
         check_in = datetime.strptime(check_in_date, '%Y-%m-%d')
         check_out = datetime.strptime(check_out_date, '%Y-%m-%d')
 
-        # Exclude rooms with conflicting reservations
+        # Exclude rooms with conflicting reservations or bookings
         unavailable_room_ids = db.session.query(Room.id).filter(
             Room.id.in_(
                 db.session.query(Reservation.room_id).filter(
                     (Reservation.check_in_date < check_out) &
                     (Reservation.check_out_date > check_in) &
                     (Reservation.status != 'Checked Out')
+                ).union(
+                    db.session.query(Booking.room_id).filter(
+                        (Booking.check_in_date < check_out) &
+                        (Booking.check_out_date > check_in) &
+                        (Booking.id != current_booking_id) &  # Exclude the current booking
+                        (Booking.status != 'Checked Out')
+                    )
                 )
             )
         ).all()
@@ -774,20 +782,21 @@ def filter_rooms_for_booking():
         unavailable_room_ids = [room_id[0] for room_id in unavailable_room_ids]
 
         # Fetch available rooms excluding those with conflicts
-        
-        available_rooms = Room.query.filter(Room.status.in_(['Available']),
+        available_rooms = Room.query.filter(
+            Room.status == 'Available',
             ~Room.id.in_(unavailable_room_ids)
         ).all()
 
         return jsonify({
             'rooms': [
-                {'id': room.id, 'room_number': room.room_number, 
+                {'id': room.id, 'room_number': room.room_number,
                  'room_type': room.room_type, 'price': room.price}
                 for room in available_rooms
             ]
         })
 
     return jsonify({'rooms': []})
+
 
 @app.route('/guests/get_by_phone', methods=['GET'])
 def get_guest_by_phone():
@@ -807,38 +816,144 @@ def get_guest_by_phone():
     return jsonify({'exists': False})
 
 @app.route('/bookings/edit/<int:booking_id>', methods=['GET', 'POST'])
+@login_required
 def edit_booking(booking_id):
     booking = Booking.query.get_or_404(booking_id)
     form = BookingForm(obj=booking)
+
+    # Pre-fill the room choice with the currently selected room
+    current_room = Room.query.get(booking.room_id)
+    form.room_id.choices = [(current_room.id, f'Room {current_room.room_number} - {current_room.room_type} (₦{current_room.price})')]
+
     if form.validate_on_submit():
-         # Recalculate the total amount based on updated check-in and check-out dates
-        nights = (form.check_out_date.data - form.check_in_date.data).days
+        check_in = form.check_in_date.data
+        check_out = form.check_out_date.data
+
+        # Ensure no overlapping reservations for the same room
+        conflicting_reservation = Booking.query.filter(
+            Booking.room_id == booking.room_id,
+            Booking.id != booking_id,  # Exclude current booking
+            Booking.status != 'Checked Out',
+            (Booking.check_in_date < check_out) & (Booking.check_out_date > check_in)
+        ).first()
+
+        if conflicting_reservation:
+            flash('The selected room is already reserved for the chosen dates. Please choose a different date range.', 'danger')
+            return render_template('edit_booking.html', form=form, booking=booking)
+
+        # Recalculate the total amount based on updated dates
+        nights = (check_out - check_in).days
         if nights <= 0:
             nights = 1  # Minimum of one night
-        
-        room = Room.query.get(form.room_id.data)
-        total_amount = room.price * nights if room else 0
+        total_amount = current_room.price * nights
 
-        # Update the booking instance
+        # Update booking details
+        booking.check_in_date = check_in
+        booking.check_out_date = check_out
         booking.first_name = form.first_name.data
         booking.last_name = form.last_name.data
         booking.phone_number = form.phone_number.data
         booking.email = form.email.data
         booking.address = form.address.data
-        booking.room_id = form.room_id.data
-        booking.check_in_date = form.check_in_date.data
-        booking.check_out_date = form.check_out_date.data
         booking.children_number = form.children_number.data
         booking.adults_number = form.adults_number.data
-        booking.status = form.status.data
+        booking.status = form.status.data  # Corrected assignment
         booking.id_type = form.id_type.data
         booking.id_number = form.id_number.data
         booking.total_amount = total_amount
+
         db.session.commit()
         flash('Booking updated successfully!', 'success')
         return redirect(url_for('manage_bookings'))
-        
+    
+    
     return render_template('edit_booking.html', form=form, booking=booking)
+
+@app.route('/bookings/check_conflict', methods=['GET'])
+def check_booking_conflict():
+    room_id = request.args.get('room_id', type=int)
+    check_in_date = request.args.get('check_in_date')
+    check_out_date = request.args.get('check_out_date')
+
+    if not (room_id and check_in_date and check_out_date):
+        return jsonify({'conflict': False, 'message': 'Invalid input data'}), 400
+
+    # Parse the dates
+    check_in = datetime.strptime(check_in_date, '%Y-%m-%d')
+    check_out = datetime.strptime(check_out_date, '%Y-%m-%d')
+
+    # Check for conflicts
+    conflicting_reservation = Reservation.query.filter(
+        Reservation.room_id == room_id,
+        Reservation.status != 'Checked Out',
+        (Reservation.check_in_date < check_out) & (Reservation.check_out_date > check_in)
+    ).first()
+
+    if conflicting_reservation:
+        return jsonify({
+            'conflict': True,
+            'message': (
+                f"The selected checkout date conflicts with an existing reservation "
+                f"from {conflicting_reservation.check_in_date.strftime('%Y-%m-%d')} "
+                f"to {conflicting_reservation.check_out_date.strftime('%Y-%m-%d')}."
+            )
+        })
+
+    return jsonify({'conflict': False})
+
+
+@app.route('/bookings/edit_room/<int:booking_id>', methods=['GET', 'POST'])
+@login_required
+def edit_booking_room(booking_id):
+    booking = Booking.query.get_or_404(booking_id)
+    form = BookingForm(obj=booking)
+
+    available_rooms = Room.query.filter_by(status='Available').all()
+    form.room_id.choices = [(room.id, f'Room {room.room_number} - {room.room_type} (₦{room.price})') for room in available_rooms]
+
+
+    if form.validate_on_submit():
+        check_in = form.check_in_date.data
+        check_out = form.check_out_date.data
+
+        # Ensure no overlapping reservations for the same room
+        conflicting_reservation = Booking.query.filter(
+            Booking.room_id == booking.room_id,
+            Booking.id != booking_id,  # Exclude current booking
+            Booking.status != 'Checked Out',
+            (Booking.check_in_date < check_out) & (Booking.check_out_date > check_in)
+        ).first()
+
+        if conflicting_reservation:
+            flash('The selected room is already reserved for the chosen dates. Please choose a different date range.', 'danger')
+            return render_template('edit_booking_room.html', form=form, booking=booking)
+
+       
+
+        # Update booking details
+        booking.check_in_date = check_in
+        booking.check_out_date = check_out
+        booking.first_name = form.first_name.data
+        booking.last_name = form.last_name.data
+        booking.phone_number = form.phone_number.data
+        booking.email = form.email.data
+        booking.address = form.address.data
+        booking.children_number = form.children_number.data
+        booking.adults_number = form.adults_number.data
+        booking.status = form.status.data  # Corrected assignment
+        booking.id_type = form.id_type.data
+        booking.id_number = form.id_number.data
+        booking.total_amount = form.calculate_total_price()
+
+        db.session.commit()
+        flash('Booking updated successfully!', 'success')
+        return redirect(url_for('manage_bookings'))
+    
+    
+    return render_template('edit_booking_room.html', form=form, booking=booking)
+
+
+
 
 @app.route('/bookings/delete/<int:booking_id>', methods=['POST'])
 def delete_booking(booking_id):
