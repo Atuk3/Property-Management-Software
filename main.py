@@ -517,17 +517,58 @@ def edit_reservation(reservation_id):
     reservation = Reservation.query.get_or_404(reservation_id)
     form = ReservationForm(obj=reservation)
 
-    available_rooms = Room.query.filter_by(status='Available').all()
-    form.room_id.choices = [(room.id, f'Room {room.room_number} - {room.room_type} (₦{room.price})') for room in available_rooms]
+    # Fetch the current room for the reservation
+    current_room = Room.query.get(reservation.room_id)
+
+    # Fetch available rooms excluding those with conflicts
+    available_rooms = Room.query.filter(
+        (Room.status != 'Maintenance') | (Room.id == current_room.id)  # Include current room
+    ).all()
+
+    room_choices = [
+        (room.id, f'Room {room.room_number} - {room.room_type} (₦{room.price})')
+        for room in available_rooms
+    ]
+    form.room_id.choices = room_choices
 
     if form.validate_on_submit():
+        check_in = form.check_in_date.data
+        check_out = form.check_out_date.data
+        room_id = form.room_id.data
+
+        # Ensure no conflicts with reservations or bookings
+        conflicting_reservation = Reservation.query.filter(
+            Reservation.room_id == room_id,
+            Reservation.id != reservation_id,  # Exclude current reservation
+            Reservation.status != 'Checked Out',
+            (Reservation.check_in_date < check_out) & (Reservation.check_out_date > check_in)
+        ).first()
+
+        conflicting_booking = Booking.query.filter(
+            Booking.room_id == room_id,
+            Booking.status == 'Checked In',
+            (Booking.check_in_date < check_out) & (Booking.check_out_date > check_in)
+        ).first()
+
+        if conflicting_reservation or conflicting_booking:
+            conflict_source = conflicting_reservation if conflicting_reservation else conflicting_booking
+            conflict_type = 'reservation' if conflicting_reservation else 'booking'
+            conflict_msg = (
+                f"The selected room is unavailable for the chosen dates due to an existing {conflict_type}. "
+                f"Room {current_room.room_number} is already reserved from "
+                f"{conflict_source.check_in_date.strftime('%Y-%m-%d')} to "
+                f"{conflict_source.check_out_date.strftime('%Y-%m-%d')}."
+            )
+            flash(conflict_msg, 'danger')
+            return render_template('edit_reservation.html', form=form, reservation=reservation)
+
         # Update reservation details
         reservation.first_name = form.first_name.data
         reservation.last_name = form.last_name.data
         reservation.email = form.email.data
-        reservation.check_in_date = form.check_in_date.data
-        reservation.check_out_date = form.check_out_date.data
-        reservation.room_id = form.room_id.data
+        reservation.check_in_date = check_in
+        reservation.check_out_date = check_out
+        reservation.room_id = room_id
         reservation.total_amount = form.calculate_total_price()
         reservation.status = form.status.data
 
@@ -536,6 +577,52 @@ def edit_reservation(reservation_id):
         return redirect(url_for('manage_reservations'))
 
     return render_template('edit_reservation.html', form=form, reservation=reservation)
+
+
+@app.route('/rooms/filters', methods=['GET'])
+def filters_rooms():
+    check_in_date = request.args.get('check_in_date')
+    check_out_date = request.args.get('check_out_date')
+    current_room_id = request.args.get('current_room_id')  # Pass the current room ID
+
+    if check_in_date and check_out_date:
+        check_in = datetime.strptime(check_in_date, '%Y-%m-%d')
+        check_out = datetime.strptime(check_out_date, '%Y-%m-%d')
+
+        # Fetch conflicting room IDs
+        unavailable_room_ids = db.session.query(Room.id).filter(
+            Room.id.in_(
+                db.session.query(Reservation.room_id).filter(
+                    (Reservation.check_in_date < check_out) &
+                    (Reservation.check_out_date > check_in) &
+                    (Reservation.status != 'Checked Out')
+                ).union(
+                    db.session.query(Booking.room_id).filter(
+                        (Booking.check_in_date < check_out) &
+                        (Booking.check_out_date > check_in) &
+                        (Booking.status == 'Checked In')
+                    )
+                )
+            )
+        ).all()
+
+        # Convert tuples to flat list
+        unavailable_room_ids = [room_id[0] for room_id in unavailable_room_ids]
+
+        # Exclude conflicts but always include the current room
+        available_rooms = Room.query.filter(
+            ~Room.id.in_(unavailable_room_ids) | (Room.id == int(current_room_id)),
+            Room.status != 'Maintenance'
+        ).all()
+
+        return jsonify({
+            'rooms': [
+                {'id': room.id, 'room_number': room.room_number, 'room_type': room.room_type, 'price': room.price}
+                for room in available_rooms
+            ]
+        })
+
+    return jsonify({'rooms': []})
 
 
 # Route to delete a reservation
@@ -751,51 +838,51 @@ def add_booking():
 
     return render_template('add_booking.html', form=form)
 
-@app.route('/rooms/filter_for_booking', methods=['GET'])
-def filter_rooms_for_booking():
-    check_in_date = request.args.get('check_in_date')
-    check_out_date = request.args.get('check_out_date')
-    current_booking_id = request.args.get('current_booking_id', type=int)  # New parameter
+# @app.route('/rooms/filter_for_booking', methods=['GET'])
+# def filter_rooms_for_booking():
+#     check_in_date = request.args.get('check_in_date')
+#     check_out_date = request.args.get('check_out_date')
+#     current_booking_id = request.args.get('current_booking_id', type=int)  # New parameter
 
-    if check_in_date and check_out_date:
-        check_in = datetime.strptime(check_in_date, '%Y-%m-%d')
-        check_out = datetime.strptime(check_out_date, '%Y-%m-%d')
+#     if check_in_date and check_out_date:
+#         check_in = datetime.strptime(check_in_date, '%Y-%m-%d')
+#         check_out = datetime.strptime(check_out_date, '%Y-%m-%d')
 
-        # Exclude rooms with conflicting reservations or bookings
-        unavailable_room_ids = db.session.query(Room.id).filter(
-            Room.id.in_(
-                db.session.query(Reservation.room_id).filter(
-                    (Reservation.check_in_date < check_out) &
-                    (Reservation.check_out_date > check_in) &
-                    (Reservation.status != 'Checked Out')
-                ).union(
-                    db.session.query(Booking.room_id).filter(
-                        (Booking.check_in_date < check_out) &
-                        (Booking.check_out_date > check_in) &
-                        (Booking.id != current_booking_id) &  # Exclude the current booking
-                        (Booking.status != 'Checked Out')
-                    )
-                )
-            )
-        ).all()
+#         # Exclude rooms with conflicting reservations or bookings
+#         unavailable_room_ids = db.session.query(Room.id).filter(
+#             Room.id.in_(
+#                 db.session.query(Reservation.room_id).filter(
+#                     (Reservation.check_in_date < check_out) &
+#                     (Reservation.check_out_date > check_in) &
+#                     (Reservation.status != 'Checked Out')
+#                 ).union(
+#                     db.session.query(Booking.room_id).filter(
+#                         (Booking.check_in_date < check_out) &
+#                         (Booking.check_out_date > check_in) &
+#                         (Booking.id != current_booking_id) &  # Exclude the current booking
+#                         (Booking.status != 'Checked Out')
+#                     )
+#                 )
+#             )
+#         ).all()
 
-        unavailable_room_ids = [room_id[0] for room_id in unavailable_room_ids]
+#         unavailable_room_ids = [room_id[0] for room_id in unavailable_room_ids]
 
-        # Fetch available rooms excluding those with conflicts
-        available_rooms = Room.query.filter(
-            Room.status == 'Available',
-            ~Room.id.in_(unavailable_room_ids)
-        ).all()
+#         # Fetch available rooms excluding those with conflicts
+#         available_rooms = Room.query.filter(
+#             Room.status == 'Available',
+#             ~Room.id.in_(unavailable_room_ids)
+#         ).all()
 
-        return jsonify({
-            'rooms': [
-                {'id': room.id, 'room_number': room.room_number,
-                 'room_type': room.room_type, 'price': room.price}
-                for room in available_rooms
-            ]
-        })
+#         return jsonify({
+#             'rooms': [
+#                 {'id': room.id, 'room_number': room.room_number,
+#                  'room_type': room.room_type, 'price': room.price}
+#                 for room in available_rooms
+#             ]
+#         })
 
-    return jsonify({'rooms': []})
+#     return jsonify({'rooms': []})
 
 
 @app.route('/guests/get_by_phone', methods=['GET'])

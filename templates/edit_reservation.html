@@ -55,6 +55,25 @@
     <div class="content">
     <div class="container">
         <h1 class="mb-4">Edit Reservation</h1>
+
+          <!-- Flash message display block -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        <div class="alert-container">
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+{% endwith %}
+
+
+        
         <form method="POST" action="{{ url_for('edit_reservation', reservation_id=reservation.id) }}">
             {{ form.hidden_tag() }}
 
@@ -69,6 +88,7 @@
             <div class="form-group">
                 {{ form.room_id.label(class="form-label") }}
                 {{ form.room_id(class="form-control", id="room_id") }}
+                <input type="hidden" id="current_room_id" value="{{ reservation.room_id }}">
             </div>
             
             <div class="form-group">
@@ -105,19 +125,20 @@
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script src="{{ url_for('static', filename='javascript/booking.js') }}"></script>
     <script>
-        document.getElementById('check_in_date').addEventListener('change', filterRooms);
-        document.getElementById('check_out_date').addEventListener('change', filterRooms);
+        document.getElementById('check_in_date').addEventListener('change', filtersRooms);
+        document.getElementById('check_out_date').addEventListener('change', filtersRooms);
     
-        function filterRooms() {
+        function filtersRooms() {
             const checkInDate = document.getElementById('check_in_date').value;
             const checkOutDate = document.getElementById('check_out_date').value;
+            const currentRoomId = document.getElementById('room_id').value; // Current room ID
     
             if (checkInDate && checkOutDate) {
-                fetch(`/rooms/filter_for_booking?check_in_date=${encodeURIComponent(checkInDate)}&check_out_date=${encodeURIComponent(checkOutDate)}`)
+                fetch(`/rooms/filters?check_in_date=${encodeURIComponent(checkInDate)}&check_out_date=${encodeURIComponent(checkOutDate)}&current_room_id=${encodeURIComponent(currentRoomId)}`)
                     .then(response => response.json())
                     .then(data => {
                         const roomSelect = document.getElementById('room_id');
-                        roomSelect.innerHTML = ''; // Clear existing options
+                        roomSelect.innerHTML = ''; // Clear current options
     
                         if (data.rooms && data.rooms.length > 0) {
                             data.rooms.forEach(room => {
@@ -125,6 +146,11 @@
                                 option.value = room.id;
                                 option.textContent = `Room ${room.room_number} - ${room.room_type} (₦${room.price})`;
                                 roomSelect.appendChild(option);
+    
+                                // Preserve the current selection
+                                if (room.id === parseInt(currentRoomId)) {
+                                    option.selected = true;
+                                }
                             });
                         } else {
                             const option = document.createElement('option');

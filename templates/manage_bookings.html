@@ -128,9 +128,9 @@
                         <form action="{{ url_for('edit_booking', booking_id=booking.id) }}" method="GET" style="display:inline;">
                             <button type="submit" class="btn btn-warning btn-sm">Edit Stay</button>
                         </form>
-                        <form action="{{ url_for('edit_booking_room', booking_id=booking.id) }}" method="GET" style="display:inline;">
+                        <!-- <form action="{{ url_for('edit_booking_room', booking_id=booking.id) }}" method="GET" style="display:inline;">
                             <button type="submit" class="btn btn-success btn-sm">Change Room</button>
-                        </form>
+                        </form> -->
                         <form action="{{ url_for('delete_booking', booking_id=booking.id) }}" method="POST" style="display:inline;">
                             <button type="submit" class="btn btn-danger btn-sm">Cancel</button>
                         </form>
