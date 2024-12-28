@@ -6,6 +6,7 @@
     <title>Add Booking</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <link rel="stylesheet" href="/static/css/dashboard.css" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
     <style>
         .container {
             max-width: 600px;
@@ -87,6 +88,10 @@
                 {{ form.check_out_date(class="form-control") }}
             </div>
             <div class="form-group">
+                {{ form.room_id.label(class="form-label") }}
+                {{ form.room_id(class="form-control") }}
+            </div>
+            <div class="form-group">
                 {{ form.first_name.label(class="form-label") }}
                 {{ form.first_name(class="form-control", id="first_name") }}
             </div>
@@ -120,10 +125,7 @@
                 {{ form.id_number(class="form-control", id="id_number") }}
             </div>
            
-            <div class="form-group">
-                {{ form.room_id.label(class="form-label") }}
-                {{ form.room_id(class="form-control") }}
-            </div>
+           
             <div class="form-group">
                 {{ form.total_amount.label(class="form-label") }}
                 {{ form.total_amount(class="form-control") }}
