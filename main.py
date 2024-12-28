@@ -838,51 +838,51 @@ def add_booking():
 
     return render_template('add_booking.html', form=form)
 
-# @app.route('/rooms/filter_for_booking', methods=['GET'])
-# def filter_rooms_for_booking():
-#     check_in_date = request.args.get('check_in_date')
-#     check_out_date = request.args.get('check_out_date')
-#     current_booking_id = request.args.get('current_booking_id', type=int)  # New parameter
+@app.route('/rooms/filter_for_booking', methods=['GET'])
+def filter_rooms_for_booking():
+    check_in_date = request.args.get('check_in_date')
+    check_out_date = request.args.get('check_out_date')
+    current_booking_id = request.args.get('current_booking_id', type=int)  # New parameter
 
-#     if check_in_date and check_out_date:
-#         check_in = datetime.strptime(check_in_date, '%Y-%m-%d')
-#         check_out = datetime.strptime(check_out_date, '%Y-%m-%d')
+    if check_in_date and check_out_date:
+        check_in = datetime.strptime(check_in_date, '%Y-%m-%d')
+        check_out = datetime.strptime(check_out_date, '%Y-%m-%d')
 
-#         # Exclude rooms with conflicting reservations or bookings
-#         unavailable_room_ids = db.session.query(Room.id).filter(
-#             Room.id.in_(
-#                 db.session.query(Reservation.room_id).filter(
-#                     (Reservation.check_in_date < check_out) &
-#                     (Reservation.check_out_date > check_in) &
-#                     (Reservation.status != 'Checked Out')
-#                 ).union(
-#                     db.session.query(Booking.room_id).filter(
-#                         (Booking.check_in_date < check_out) &
-#                         (Booking.check_out_date > check_in) &
-#                         (Booking.id != current_booking_id) &  # Exclude the current booking
-#                         (Booking.status != 'Checked Out')
-#                     )
-#                 )
-#             )
-#         ).all()
+        # Exclude rooms with conflicting reservations or bookings
+        unavailable_room_ids = db.session.query(Room.id).filter(
+            Room.id.in_(
+                db.session.query(Reservation.room_id).filter(
+                    (Reservation.check_in_date < check_out) &
+                    (Reservation.check_out_date > check_in) &
+                    (Reservation.status != 'Checked Out')
+                ).union(
+                    db.session.query(Booking.room_id).filter(
+                        (Booking.check_in_date < check_out) &
+                        (Booking.check_out_date > check_in) &
+                        (Booking.id != current_booking_id) &  # Exclude the current booking
+                        (Booking.status != 'Checked Out')
+                    )
+                )
+            )
+        ).all()
 
-#         unavailable_room_ids = [room_id[0] for room_id in unavailable_room_ids]
+        unavailable_room_ids = [room_id[0] for room_id in unavailable_room_ids]
 
-#         # Fetch available rooms excluding those with conflicts
-#         available_rooms = Room.query.filter(
-#             Room.status == 'Available',
-#             ~Room.id.in_(unavailable_room_ids)
-#         ).all()
+        # Fetch available rooms excluding those with conflicts
+        available_rooms = Room.query.filter(
+            Room.status == 'Available',
+            ~Room.id.in_(unavailable_room_ids)
+        ).all()
 
-#         return jsonify({
-#             'rooms': [
-#                 {'id': room.id, 'room_number': room.room_number,
-#                  'room_type': room.room_type, 'price': room.price}
-#                 for room in available_rooms
-#             ]
-#         })
+        return jsonify({
+            'rooms': [
+                {'id': room.id, 'room_number': room.room_number,
+                 'room_type': room.room_type, 'price': room.price}
+                for room in available_rooms
+            ]
+        })
 
-#     return jsonify({'rooms': []})
+    return jsonify({'rooms': []})
 
 
 @app.route('/guests/get_by_phone', methods=['GET'])
