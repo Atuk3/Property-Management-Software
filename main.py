@@ -16,6 +16,9 @@ from flask_bcrypt import Bcrypt
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import login_user, login_required, logout_user, current_user,LoginManager
 from flask_migrate import Migrate
+from functools import wraps
+from flask import redirect, url_for, flash
+
 # from flask import Flask
 # from flask_mail import Mail, Message
 
@@ -42,6 +45,7 @@ migrate=Migrate(app,db)
 
  
 
+
 #----------------------------------------------------------------
 #Database Creation
 class User(db.Model, UserMixin):
@@ -49,6 +53,8 @@ class User(db.Model, UserMixin):
     username = db.Column(db.String(150), nullable=False, unique=True)
     password = db.Column(db.String(150), nullable=False)
     role = db.Column(db.String(50), nullable=False)
+
+
 
 class Reservation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -260,7 +266,20 @@ class BookingForm(FlaskForm):
             # Calculate total price
             return room.price * nights
         return 0
-# ----------------------------------------------------------------    
+# ----------------------------------------------------------------  
+
+def role_required(allowed_roles):
+    """Decorator to restrict access based on roles."""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            if current_user.is_authenticated and current_user.role in allowed_roles:
+                return func(*args, **kwargs)
+            flash("You do not have access to this page.", "danger")
+            return redirect(url_for('dashboard'))  # Redirect to a safe page
+        return wrapper
+    return decorator
+  
 # Define the homepage route
 @app.route('/', methods=['GET', 'POST'])
 @app.route('/home', methods=['GET', 'POST'])
@@ -276,6 +295,7 @@ def load_user(user_id):
 
 
 @app.route('/register', methods=['GET', 'POST'])
+@role_required(['admin', 'manager'])
 def register():
     form = RegistrationForm()
     if form.validate_on_submit():

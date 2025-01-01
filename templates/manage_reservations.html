@@ -121,6 +121,7 @@
                     <td>{{ reservation.status }}</td>
                     <td>₦{{ reservation.total_amount }}</td>
                     <td>
+                        
                         <form action="{{ url_for('edit_reservation', reservation_id=reservation.id) }}" method="GET" style="display:inline-block;">
                             <button type="submit" class="btn btn-warning btn-sm">Edit</button>
                         </form>
