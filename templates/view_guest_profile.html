@@ -5,19 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Guest Profile</title>
     
-    <!-- Bootstrap CSS -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-
-    <!-- Custom CSS -->
     <link rel="stylesheet" href="/static/css/dashboard.css" />
-
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
 
-    <!-- Additional Styling -->
+
     <style>
-        .container {
-            max-width: 900px;
+       .container {
+            max-width: 1200px;
             margin-top: 2rem;
         }
         .table th, .table td {
@@ -31,63 +26,49 @@
             font-size: 1.5rem;
             margin-bottom: 1rem;
         }
-        .sidebar {
-            position: fixed;
-            height: 100%;
-            background-color: #343a40;
-            padding: 1rem;
-            width: 200px;
-        }
-        .sidebar .nav-link {
-            color: white;
-            font-size: 1rem;
-            padding: 0.75rem 0;
-        }
-        .sidebar .nav-link.active, .sidebar .nav-link:hover {
-            background-color: #495057;
-            border-radius: 5px;
-        }
-        .sidebar img {
-            width: 120px;
-            margin-bottom: 1rem;
-        }
+      
+       
     </style>
 </head>
 <body>
-    <!-- Sidebar Navigation -->
-    <div class="sidebar">
-        <div class="text-center">
-            <img src="/static/assets/images/planetgelimgbulogo.png" alt="Hotel Logo" class="img-fluid">
-        </div>
-
-        <nav class="nav flex-column">
-            <a class="nav-link active" href="/dashboard">
-                <i class="fas fa-tachometer-alt mr-2"></i>Dashboard
-            </a>
-            <a class="nav-link" href="/reservations">
-                <i class="fas fa-calendar-check mr-2"></i>Reservations
-            </a>
-            <a class="nav-link" href="/bookings">
-                <i class="fas fa-sign-in-alt mr-2"></i>Check In
-            </a>
-            <a class="nav-link" href="/rooms">
-                <i class="fas fa-door-closed mr-2"></i>Manage Rooms
-            </a>
-            <a class="nav-link" href="/housekeeping">
-                <i class="fas fa-broom mr-2"></i>Housekeeping
-            </a>
-            <a class="nav-link" href="/guests">
-                <i class="fas fa-users mr-2"></i>Guests
-            </a>
-           
-            <a class="nav-link" href="/logout">
-                <i class="fas fa-sign-out-alt mr-2"></i>Logout
-            </a>
-        </nav>
+      <!-- Sidebar Navigation -->
+<div class="col-md-2 col-sm-4 bg-dark text-white vh-100 p-1 sidebar">
+    <!-- Hotel Logo -->
+    <div class="text-center">
+        <img src="/static/assets/images/planetgelimgbulogo.png" alt="Hotel Logo" class="img-fluid mb-2" style="width: 150px;">
+    
     </div>
 
+    <!-- Navigation Links -->
+    <nav class="nav flex-column">
+        <a class="nav-link text-white py-2" href="/dashboard">
+            <i class="fas fa-tachometer-alt mr-2"></i>Dashboard
+        </a>
+        <a class="nav-link text-white py-2" href="/reservations">
+            <i class="fas fa-calendar-check mr-2"></i>Reservations
+        </a>
+        <a class="nav-link text-white py-2" href="/bookings">
+            <i class="fas fa-sign-in-alt mr-2"></i>Check In
+        </a>
+        <a class="nav-link text-white py-2" href="/rooms">
+            <i class="fas fa-door-closed mr-2"></i>Manage Rooms
+        </a>
+        <a class="nav-link text-white py-2" href="/housekeeping">
+            <i class="fas fa-broom mr-2"></i>Housekeeping
+        </a>
+        <a class="nav-link text-white py-2" href="/guests">
+            <i class="fas fa-users mr-2"></i>Guests
+        </a>
+       
+        <a class="nav-link text-white py-2" href="/logout">
+            <i class="fas fa-sign-out-alt mr-2"></i>Logout
+        </a>
+    </nav>
+</div>
+
     <!-- Main Content -->
-    <div class="container" style="margin-left: 220px;">
+    <div class="content">
+    <div class="container">
         <h1 class="mb-4">Guest Profile: <span class="text-primary">{{ guest.first_name }} {{ guest.last_name }}</span></h1>
 
         <!-- Contact Information Card -->
@@ -129,6 +110,7 @@
 
         <!-- Back Button -->
         <a href="{{ url_for('manage_guests') }}" class="btn btn-primary mt-3">Back to Guest List</a>
+    </div>
     </div>
 
     <!-- Scripts -->

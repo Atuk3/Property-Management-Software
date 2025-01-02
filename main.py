@@ -18,6 +18,8 @@ from flask_login import login_user, login_required, logout_user, current_user,Lo
 from flask_migrate import Migrate
 from functools import wraps
 from flask import redirect, url_for, flash
+from flask import request, render_template, make_response
+
 
 # from flask import Flask
 # from flask_mail import Mail, Message
@@ -1231,6 +1233,52 @@ def view_guest_profile(guest_id):
     bookings = Booking.query.filter_by(guest_id=guest.id).all()
     return render_template('view_guest_profile.html', guest=guest, bookings=bookings)
 
+
+@app.route('/reports', methods=['GET', 'POST'])
+@login_required
+def reports():
+    if current_user.role not in ['admin', 'manager']:
+        flash('You are not authorized to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+
+    # Handle POST request for report generation
+    if request.method == 'POST':
+        start_date = request.form.get('start_date')
+        end_date = request.form.get('end_date')
+
+        if not start_date or not end_date:
+            flash('Please select a valid date range.', 'danger')
+            return redirect(url_for('reports'))
+
+        # Convert dates
+        start_date = datetime.strptime(start_date, '%Y-%m-%d')
+        end_date = datetime.strptime(end_date, '%Y-%m-%d')
+
+        # Fetch data for the report
+        reservations = Reservation.query.filter(
+            Reservation.check_in_date >= start_date,
+            Reservation.check_out_date <= end_date
+        ).all()
+
+        bookings = Booking.query.filter(
+            Booking.check_in_date >= start_date,
+            Booking.check_out_date <= end_date
+        ).all()
+
+        # Calculate revenue
+        total_revenue = sum(booking.total_amount for booking in bookings)
+
+        # Render the report template
+        return render_template(
+            'report_template.html',
+            reservations=reservations,
+            bookings=bookings,
+            total_revenue=total_revenue,
+            start_date=start_date,
+            end_date=end_date
+        )
+
+    return render_template('reports.html')
 
 
 if __name__ == '__main__':
