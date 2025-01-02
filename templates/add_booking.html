@@ -81,11 +81,11 @@
             </div>
             <div class="form-group">
                 {{ form.check_in_date.label(class="form-label") }}
-                {{ form.check_in_date(class="form-control" , readonly=True) }}  <!-- Set as readonly -->
+                {{ form.check_in_date(class="form-control" , readonly=True, id="check_in_date") }}  <!-- Set as readonly -->
             </div>
             <div class="form-group">
                 {{ form.check_out_date.label(class="form-label") }}
-                {{ form.check_out_date(class="form-control") }}
+                {{ form.check_out_date(class="form-control" , id="check_out_date") }}
             </div>
             <div class="form-group">
                 {{ form.room_id.label(class="form-label") }}
@@ -197,6 +197,15 @@
                     .catch(error => console.error('Error fetching available rooms:', error));
             }
         }
+    </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const today = new Date().toISOString().split('T')[0];
+            
+            // Set the minimum date for check-in and check-out fields
+            document.getElementById('check_in_date').setAttribute('min', today);
+            document.getElementById('check_out_date').setAttribute('min', today);
+        });
     </script>
 
 </body>

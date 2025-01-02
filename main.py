@@ -7,7 +7,7 @@ from datetime import date, timedelta, datetime
 from flask import Flask,render_template, request, jsonify,flash,url_for,redirect,session,make_response
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
-from wtforms import DecimalField,  StringField, PasswordField, SubmitField, SelectField, DateField, TextAreaField
+from wtforms import DecimalField, EmailField, IntegerField,  StringField, PasswordField, SubmitField, SelectField, DateField, TextAreaField
 from flask_login import UserMixin,login_user,login_required,logout_user,current_user
 from werkzeug.utils import secure_filename
 from wtforms.validators import InputRequired, DataRequired, EqualTo, Length, ValidationError, NumberRange
@@ -197,8 +197,8 @@ class ReservationForm(FlaskForm):
     check_in_date = DateField('Check-in Date', format='%Y-%m-%d', validators=[DataRequired()])
     check_out_date = DateField('Check-out Date', format='%Y-%m-%d', validators=[DataRequired()])
     room_id = SelectField('Room', coerce=int, validators=[DataRequired()])
-    phone_number = StringField('Phone Number', validators=[DataRequired()])
-    email = StringField('Email', validators=[DataRequired()])
+    phone_number = IntegerField('Phone Number', validators=[DataRequired()])
+    email = EmailField('Email', validators=[DataRequired()])
     status = SelectField('Status', choices=[('Reserved', 'Reserved')], validators=[DataRequired()])
     total_amount = DecimalField('Total Amount (₦)', places=2, render_kw={'readonly': True})  # Remove validator
     submit = SubmitField('Save Reservation')
@@ -218,7 +218,7 @@ class ReservationForm(FlaskForm):
         return 0
 
 class RoomForm(FlaskForm):
-    room_number = StringField('Room Number', validators=[DataRequired(), Length(min=1, max=10)])
+    room_number = IntegerField('Room Number', validators=[DataRequired(), Length(min=1, max=10)])
     room_type = SelectField('Room Type', choices=[('Standard 1', 'Standard 1'), ('Standard 2', 'Standard 2'), ('Executive', 'Executive'), ('Executive Wing B', 'Executive Wing B'), ('Exclusive', 'Exclusive')], validators=[DataRequired()])
     status = SelectField('Status', choices=[('Available', 'Available'), ('Occupied', 'Occupied'), ('Maintenance', 'Maintenance'), ('Cleaning', 'Cleaning')], validators=[DataRequired()])
     price = DecimalField('Price', validators=[DataRequired()])
@@ -229,11 +229,11 @@ class BookingForm(FlaskForm):
     last_name = StringField('Last Name', validators=[DataRequired()])
     room_id = SelectField('Room', coerce=int, validators=[DataRequired()])
     phone_number = StringField('Phone Number', validators=[DataRequired(), Length(min=11)])
-    email = StringField('Email', validators=[DataRequired()])
+    email = EmailField('Email', validators=[DataRequired()])
     address = StringField('Address', validators=[DataRequired()])
     id_type = SelectField('ID Type', choices=[('nin', 'NIN'), ('drivers_license', 'Driver\'s License'), ('id_card', 'ID Card')], validators=[DataRequired()])
-    id_number = StringField('ID Number', validators=[DataRequired()])
-    adults_number=StringField('Adults Number', validators=[DataRequired()])
+    id_number = IntegerField('ID Number', validators=[DataRequired()])
+    adults_number=IntegerField('Adults Number', validators=[DataRequired()])
     children_number=StringField('Children Number', validators=[DataRequired()])
     check_in_date = DateField('Check-in Date', format='%Y-%m-%d', validators=[DataRequired()])
     check_out_date = DateField('Check-out Date', format='%Y-%m-%d')
@@ -297,7 +297,7 @@ def load_user(user_id):
 
 
 @app.route('/register', methods=['GET', 'POST'])
-@role_required(['admin', 'manager'])
+
 def register():
     form = RegistrationForm()
     if form.validate_on_submit():
@@ -440,6 +440,14 @@ def add_reservation():
     if form.validate_on_submit():
         check_in = form.check_in_date.data
         check_out = form.check_out_date.data
+
+    
+
+        # Check if dates are in the past
+        today = date.today()
+        if check_in < today or check_out < today:
+            flash('Check-in and Check-out dates cannot be in the past.', 'danger')
+            return render_template('add_reservation.html', form=form)
 
         # Check for room availability before submission
         room_id = form.room_id.data
