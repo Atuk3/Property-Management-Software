@@ -1242,51 +1242,101 @@ def view_guest_profile(guest_id):
     return render_template('view_guest_profile.html', guest=guest, bookings=bookings)
 
 
-@app.route('/reports', methods=['GET', 'POST'])
+from datetime import datetime, timedelta
+from sqlalchemy import func
+
+from flask import render_template, request
+from datetime import datetime
+from sqlalchemy import func
+from flask_login import login_required
+from sqlalchemy.orm import joinedload
+
+@app.route('/reports', methods=['GET'])
 @login_required
 def reports():
-    if current_user.role not in ['admin', 'manager']:
-        flash('You are not authorized to access this page.', 'danger')
-        return redirect(url_for('dashboard'))
+    try:
+        # Get today's date
+        today = datetime.today()
 
-    # Handle POST request for report generation
-    if request.method == 'POST':
-        start_date = request.form.get('start_date')
-        end_date = request.form.get('end_date')
+        # Get start_date and end_date from query parameters
+        start_date = request.args.get('start_date', None)
+        end_date = request.args.get('end_date', None)
 
-        if not start_date or not end_date:
-            flash('Please select a valid date range.', 'danger')
-            return redirect(url_for('reports'))
+        # Validate and parse dates
+        if start_date and end_date:
+            try:
+                start_date = datetime.strptime(start_date, '%Y-%m-%d').replace(hour=0, minute=0, second=0, microsecond=0)
+                end_date = datetime.strptime(end_date, '%Y-%m-%d').replace(hour=23, minute=59, second=59, microsecond=999999)
 
-        # Convert dates
-        start_date = datetime.strptime(start_date, '%Y-%m-%d')
-        end_date = datetime.strptime(end_date, '%Y-%m-%d')
+                if start_date > end_date:
+                    flash("Start date cannot be after end date.", "danger")
+                    return redirect(url_for('reports'))
+            except ValueError:
+                flash("Invalid date format. Please use YYYY-MM-DD.", "danger")
+                return redirect(url_for('reports'))
+        else:
+            # Default to the first day of the current month and today
+            start_date = today.replace(day=1)
+            end_date = today.replace(hour=23, minute=59, second=59, microsecond=999999)
 
-        # Fetch data for the report
+        # --- FILTERED INSIGHTS BASED ON DATE RANGE ---
         reservations = Reservation.query.filter(
             Reservation.check_in_date >= start_date,
-            Reservation.check_out_date <= end_date
-        ).all()
+            Reservation.check_in_date <= end_date
+        ).options(joinedload(Reservation.room)).all()
 
+        # Bookings (Checked-In) within the selected date range
         bookings = Booking.query.filter(
-            Booking.check_in_date >= start_date,
-            Booking.check_out_date <= end_date
-        ).all()
+            Booking.check_in_date <= end_date,  # Check-in should be before or on the end date
+            Booking.check_out_date >= start_date,  # Check-out should be after or on the start date
+            Booking.status == 'Checked In'
+        ).options(joinedload(Booking.room)).all()
 
-        # Calculate revenue
-        total_revenue = sum(booking.total_amount for booking in bookings)
+        # Total revenue within the selected date range
+        total_revenue = db.session.query(func.sum(Booking.total_amount)).filter(
+            Booking.check_in_date <= end_date,
+            Booking.check_out_date >= start_date,
+            Booking.status == 'Checked In'
+        ).scalar() or 0
 
-        # Render the report template
+        # Guests arriving within the selected date range
+        guests_arriving = Reservation.query.filter(
+            Reservation.check_in_date >= start_date,
+            Reservation.check_in_date <= end_date,
+            Reservation.status == 'Reserved'
+        ).options(joinedload(Reservation.room)).all()
+
+        # Guests departing within the selected date range
+        guests_departing = Booking.query.filter(
+            Booking.check_out_date >= start_date,
+            Booking.check_out_date <= end_date,
+            Booking.status == 'Checked In'
+        ).options(joinedload(Booking.room)).all()
+
+        # Room occupancy rate (current status of rooms)
+        total_rooms = Room.query.count()
+        occupied_rooms = Room.query.filter_by(status='Occupied').count()
+        occupancy_rate = (occupied_rooms / total_rooms * 100) if total_rooms > 0 else 0
+
+        # Render the filtered report data to the reports.html page
         return render_template(
-            'report_template.html',
+            'reports.html',
             reservations=reservations,
             bookings=bookings,
             total_revenue=total_revenue,
+            guests_arriving=guests_arriving,
+            guests_departing=guests_departing,
+            occupancy_rate=occupancy_rate,
             start_date=start_date,
             end_date=end_date
         )
 
-    return render_template('reports.html')
+    except Exception as e:
+        app.logger.error(f"Error generating report: {e}")
+        flash("An error occurred while generating the report. Please try again.", "danger")
+        return redirect(url_for('reports'))
+
+
 
 
 if __name__ == '__main__':

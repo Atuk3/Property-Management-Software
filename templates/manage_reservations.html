@@ -50,6 +50,11 @@
         <a class="nav-link text-white py-2" href="/guests">
             <i class="fas fa-users mr-2"></i>Guests
         </a>
+        {% if current_user.role in ['admin'] %}
+        <a class="nav-link text-white py-2" href="/reports">
+            <i class="fas fa-chart-bar mr-2"></i>Reports
+        </a>
+        {% endif %}
         <a class="nav-link text-white py-2" href="/logout">
             <i class="fas fa-sign-out-alt mr-2"></i>Logout
         </a>
