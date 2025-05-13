@@ -10,7 +10,7 @@ from flask_wtf import FlaskForm
 from wtforms import DecimalField, EmailField, IntegerField,  StringField, PasswordField, SubmitField, SelectField, DateField, TextAreaField
 from flask_login import UserMixin,login_user,login_required,logout_user,current_user
 from werkzeug.utils import secure_filename
-from wtforms.validators import InputRequired, DataRequired, EqualTo, Length, ValidationError, NumberRange
+from wtforms.validators import InputRequired, DataRequired, EqualTo, Length, ValidationError, NumberRange, Optional
 from sqlalchemy.sql import func
 from flask_bcrypt import Bcrypt
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -113,8 +113,8 @@ class Booking(db.Model):
     phone_number = db.Column(db.String(20), nullable=False)
     email = db.Column(db.String(120), nullable=False)
     address = db.Column(db.String(200), nullable=False)
-    id_type = db.Column(db.String(50), nullable=False)
-    id_number = db.Column(db.String(50), nullable=False)
+    id_type = db.Column(db.String(50), nullable=True)
+    id_number = db.Column(db.String(50), nullable=True)
     check_in_date = db.Column(db.Date, nullable=False)
     check_out_date = db.Column(db.Date, nullable=False)
     children_number = db.Column(db.Integer, nullable=False)
@@ -162,8 +162,8 @@ class Guest(db.Model):
     phone_number = db.Column(db.String(20), nullable=False, unique=True)  # Ensure phone number is unique
     email = db.Column(db.String(120), nullable=False, unique=True)  # Email remains unique
     address = db.Column(db.String(200), nullable=False)
-    id_type = db.Column(db.String(50), nullable=False)
-    id_number = db.Column(db.String(50), nullable=False)
+    id_type = db.Column(db.String(50), nullable=True)
+    id_number = db.Column(db.String(50), nullable=True)
 
     # Relationship to Booking
     bookings = db.relationship('Booking', backref='guest', lazy=True)
@@ -218,8 +218,8 @@ class ReservationForm(FlaskForm):
         return 0
 
 class RoomForm(FlaskForm):
-    room_number = IntegerField('Room Number', validators=[DataRequired(), Length(min=1, max=10)])
-    room_type = SelectField('Room Type', choices=[('Standard 1', 'Standard 1'), ('Standard 2', 'Standard 2'), ('Executive', 'Executive'), ('Executive Wing B', 'Executive Wing B'), ('Exclusive', 'Exclusive')], validators=[DataRequired()])
+    room_number = IntegerField('Room Number', validators=[DataRequired()])
+    room_type = SelectField('Room Type', choices=[('Standard', 'Standard'), ('Executive', 'Executive'), ('Executive Wing B', 'Executive Wing B'), ('Exclusive', 'Exclusive'), ('Deluxe', 'Deluxe'), ('Suite', 'Suite')], validators=[DataRequired()])
     status = SelectField('Status', choices=[('Available', 'Available'), ('Occupied', 'Occupied'), ('Maintenance', 'Maintenance'), ('Cleaning', 'Cleaning')], validators=[DataRequired()])
     price = DecimalField('Price', validators=[DataRequired()])
     submit = SubmitField('Save')
@@ -231,8 +231,8 @@ class BookingForm(FlaskForm):
     phone_number = StringField('Phone Number', validators=[DataRequired(), Length(min=11)])
     email = EmailField('Email', validators=[DataRequired()])
     address = StringField('Address', validators=[DataRequired()])
-    id_type = SelectField('ID Type', choices=[('nin', 'NIN'), ('drivers_license', 'Driver\'s License'), ('id_card', 'ID Card')], validators=[DataRequired()])
-    id_number = IntegerField('ID Number', validators=[DataRequired()])
+    id_type = SelectField('ID Type', choices=[('NIN', 'NIN'), ('DRIVERS LICENSE', 'Driver\'s License'), ('ID CARD', 'ID Card')], validators=[Optional()])
+    id_number = IntegerField('ID Number', validators=[Optional()])
     adults_number=IntegerField('Adults Number', validators=[DataRequired()])
     children_number=StringField('Children Number', validators=[DataRequired()])
     check_in_date = DateField('Check-in Date', format='%Y-%m-%d', validators=[DataRequired()])
