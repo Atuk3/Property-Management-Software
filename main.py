@@ -2,7 +2,6 @@
 import json
 import os
 import io
-import psycopg2
 from datetime import date, timedelta, datetime
 from flask import Flask,render_template, request, jsonify,flash,url_for,redirect,session,make_response
 from flask_sqlalchemy import SQLAlchemy
@@ -15,7 +14,6 @@ from sqlalchemy.sql import func
 from flask_bcrypt import Bcrypt
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import login_user, login_required, logout_user, current_user,LoginManager
-from flask_migrate import Migrate
 from functools import wraps
 from flask import redirect, url_for, flash
 from flask import request, render_template, make_response
@@ -43,7 +41,7 @@ db.init_app(app)
 bcrypt= Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
-migrate=Migrate(app,db)
+# migrate=Migrate(app,db)
 
  
 
