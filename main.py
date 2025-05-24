@@ -1334,8 +1334,147 @@ def reports():
         flash("An error occurred while generating the report. Please try again.", "danger")
         return redirect(url_for('reports'))
 
+import csv
+from io import StringIO
+from flask import Response
 
+@app.route('/export_csv')
+@login_required
+def export_csv():
+    try:
+        # Get and parse date range
+        start_date_str = request.args.get('start_date')
+        end_date_str = request.args.get('end_date')
 
+        if not start_date_str or not end_date_str:
+            flash("Please specify both start and end dates for export.", "danger")
+            return redirect(url_for('reports'))
+
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').replace(hour=0, minute=0, second=0)
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+
+        # Query data
+        bookings = Booking.query.filter(
+            Booking.check_in_date <= end_date,
+            Booking.check_out_date >= start_date,
+            Booking.status == 'Checked In'
+        ).options(joinedload(Booking.room)).all()
+
+        reservations = Reservation.query.filter(
+            Reservation.check_in_date >= start_date,
+            Reservation.check_in_date <= end_date
+        ).options(joinedload(Reservation.room)).all()
+
+        # guests_arriving = Reservation.query.filter(
+        #     Reservation.check_in_date >= start_date,
+        #     Reservation.check_in_date <= end_date,
+        #     Reservation.status == 'Reserved'
+        # ).options(joinedload(Reservation.room)).all()
+
+        # guests_departing = Booking.query.filter(
+        #     Booking.check_out_date >= start_date,
+        #     Booking.check_out_date <= end_date,
+        #     Booking.status == 'Checked In'
+        # ).options(joinedload(Booking.room)).all()
+
+        total_rooms = Room.query.count()
+        occupied_rooms = Room.query.filter_by(status='Occupied').count()
+        occupancy_rate = (occupied_rooms / total_rooms * 100) if total_rooms > 0 else 0
+
+        total_revenue = sum(b.total_amount for b in bookings)
+
+        total_adults = sum(b.adults_number for b in bookings)  # assuming you have an 'adults' field
+        total_children = sum(b.children_number for b in bookings)  # assuming you have a 'children' field
+
+        # Prepare CSV
+        output = StringIO()
+        writer = csv.writer(output)
+
+        # Bookings Section
+        writer.writerow(['Bookings'])
+        writer.writerow(['ID', 'Guest Name', 'Room Number', 'Room Type', 'Check-In', 'Check-Out', 'Amount', 'Phone', 'Email'])
+        for b in bookings:
+            writer.writerow([
+                b.id,
+                f"{b.first_name} {b.last_name}",
+                b.room.room_number if b.room else 'N/A',
+                b.room.room_type if b.room else 'N/A',
+                b.check_in_date.strftime('%Y-%m-%d'),
+                b.check_out_date.strftime('%Y-%m-%d'),
+                b.total_amount,
+                b.phone_number,
+                b.email
+            ])
+        writer.writerow([])  # empty row to separate sections
+
+        # Reservations Section
+        writer.writerow(['Reservations'])
+        writer.writerow(['ID', 'Guest Name', 'Room Number', 'Room Type', 'Check-In', 'Check-Out', 'Phone', 'Email'])
+        for r in reservations:
+            writer.writerow([
+                r.id,
+                f"{r.first_name} {r.last_name}",
+                r.room.room_number if r.room else 'N/A',
+                r.room.room_type if r.room else 'N/A',
+                r.check_in_date.strftime('%Y-%m-%d'),
+                r.check_out_date.strftime('%Y-%m-%d'),
+                f"0{r.phone_number}",
+                r.email
+            ])
+        writer.writerow([])
+
+        # Guests Arriving Section
+        # writer.writerow(['Guests Arriving'])
+        # writer.writerow(['Guest Name', 'Room Number', 'Room Type', 'Check-In Date', 'Phone Number', 'Email'])
+        # for g in guests_arriving:
+        #     writer.writerow([
+        #         f"{g.first_name} {g.last_name}",
+        #         g.room.room_number if g.room else 'N/A',
+        #         g.room.room_type if g.room else 'N/A',
+        #         g.check_in_date.strftime('%Y-%m-%d'),
+        #         g.phone_number,
+        #         g.email
+        #     ])
+        # writer.writerow([])
+
+        # Guests Departing Section
+        # writer.writerow(['Guests Departing'])
+        # writer.writerow(['Guest Name', 'Room Number', 'Room Type', 'Check-Out Date', 'Phone Number', 'Email'])
+        # for g in guests_departing:
+        #     writer.writerow([
+        #         f"{g.first_name} {g.last_name}",
+        #         g.room.room_number if g.room else 'N/A',
+        #         g.room.room_type if g.room else 'N/A',
+        #         g.check_out_date.strftime('%Y-%m-%d'),
+        #         g.phone_number,
+        #         g.email
+        #     ])
+        # writer.writerow([])
+
+        # Summary Statistics
+        writer.writerow(['Summary Statistics'])
+        writer.writerow(['Total Rooms', total_rooms])
+        writer.writerow(['Occupied Rooms', occupied_rooms])
+        writer.writerow(['Occupancy Rate (%)', f"{occupancy_rate:.2f}"])
+        writer.writerow(['Total Revenue', f"{total_revenue}"])
+        writer.writerow(['Total Adults', total_adults])
+        writer.writerow(['Total Children', total_children])
+
+        # Return CSV response
+        output.seek(0)
+        return Response(
+            output,
+            mimetype='text/csv',
+            headers={
+                "Content-Disposition": f"attachment; filename=PlanetG Hotel Report_{start_date_str}_to_{end_date_str}.csv"
+            }
+        )
+
+    except Exception as e:
+        app.logger.error(f"Error exporting CSV: {e}")
+        print(f"Error exporting CSV: {e}")  # Print to console for dev debugging
+        flash("An error occurred while exporting the report.", "danger")
+        return redirect(url_for('reports'))
 
 if __name__ == '__main__':
     with app.app_context():
