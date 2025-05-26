@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Add Booking</title>
+    <title>Edit Booking</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <link rel="stylesheet" href="/static/css/dashboard.css" />
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
     <style>
         .container {
             max-width: 600px;
@@ -18,7 +17,7 @@
     </style>
 </head>
 <body>
-    <!-- Sidebar Navigation -->
+   <!-- Sidebar Navigation -->
 <div class="col-md-2 col-sm-4 bg-dark text-white vh-100 p-1 sidebar">
     <!-- Hotel Logo -->
     <div class="text-center">
@@ -26,7 +25,7 @@
     
     </div>
 
-      <!-- Navigation Links -->
+   <!-- Navigation Links -->
     <nav class="nav flex-column">
         <a class="nav-link text-white py-2" href="/dashboard">
             <i class="fas fa-tachometer-alt mr-2"></i>Dashboard
@@ -52,8 +51,7 @@
     <a class="nav-link text-white py-2" href="/user_logs">
         <i class="fas fa-chart-bar mr-2"></i>Logs
     </a>
-    {% endif %}
-     
+   {% endif %}
          {% if current_user.role in ['admin'] %}
         <a class="nav-link text-white py-2" href="/users/manage">
             <i class="fas fa-history mr-2"></i>Manage Staffs
@@ -70,12 +68,12 @@
         </a>
     </nav>
 </div>
+
     <!-- Main Content Area -->
     <div class="content">
     <div class="container">
-       
-        <h1 class="mb-4">Add Booking</h1>
-         <!-- Flash message display block -->
+        <h1 class="mb-4">Edit User</h1>
+           <!-- Flash message display block -->
     {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
         <div class="alert-container">
@@ -90,71 +88,30 @@
         </div>
     {% endif %}
 {% endwith %}
-        <form method="POST" action="{{ url_for('add_booking') }}">
-            {{ form.hidden_tag() }}
-            <div class="form-group">
-                {{ form.phone_number.label(class="form-label") }}
-                {{ form.phone_number(class="form-control", id="phone_number") }}
-                <small id="phoneHelp" class="form-text text-muted">Check if the customer already exists.</small>
-            </div>
-            <div class="form-group">
-                {{ form.check_in_date.label(class="form-label") }}
-                {{ form.check_in_date(class="form-control" , readonly=True, id="check_in_date") }}  <!-- Set as readonly -->
-            </div>
-            <div class="form-group">
-                {{ form.check_out_date.label(class="form-label") }}
-                {{ form.check_out_date(class="form-control" , id="check_out_date") }}
-            </div>
-            <div class="form-group">
-                {{ form.room_id.label(class="form-label") }}
-                {{ form.room_id(class="form-control") }}
-            </div>
-            <div class="form-group">
-                {{ form.first_name.label(class="form-label") }}
-                {{ form.first_name(class="form-control", id="first_name") }}
-            </div>
-            <div class="form-group">
-                {{ form.last_name.label(class="form-label") }}
-                {{ form.last_name(class="form-control", id="last_name") }}
-            </div>
-           
-            <div class="form-group">
-                {{ form.email.label(class="form-label") }}
-                {{ form.email(class="form-control", id="email") }}
-            </div>
-            <div class="form-group">
-                {{ form.address.label(class="form-label") }}
-                {{ form.address(class="form-control", id="address") }}
-            </div>
-            <div class="form-group">
-                {{ form.adults_number.label(class="form-label") }}
-                {{ form.adults_number(class="form-control") }}
-            </div>
-            <div class="form-group">
-                {{ form.children_number.label(class="form-label") }}
-                {{ form.children_number(class="form-control") }}
-            </div>
-            <div class="form-group">
-                {{ form.id_type.label(class="form-label") }}
-                {{ form.id_type(class="form-control", id="id_type") }}
-            </div>
-            <div class="form-group">
-                {{ form.id_number.label(class="form-label") }}
-                {{ form.id_number(class="form-control", id="id_number") }}
-            </div>
-           
-           
-            <div class="form-group">
-                {{ form.total_amount.label(class="form-label") }}
-                {{ form.total_amount(class="form-control") }}
-            </div>
-            <div class="form-group">
-                {{ form.status.label }} {{ form.status(class="form-control") }}
-            </div>
-            <div class="form-group">
-                {{ form.submit(class="btn btn-primary btn-block") }}
-            </div>
-        </form>
+        <form method="POST">
+
+    <div class="mb-3">
+      <label for="username" class="form-label">Username</label>
+      <input type="text" class="form-control" name="username" value="{{ user.username }}" required>
+    </div>
+
+    <div class="mb-3">
+      <label for="password" class="form-label">New Password (leave blank to keep current)</label>
+      <input type="password" class="form-control" name="password">
+    </div>
+
+    <div class="mb-3">
+      <label for="role" class="form-label">Role</label>
+      <select class="form-select" name="role" required>
+        <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
+        <option value="manager" {% if user.role == 'manager' %}selected{% endif %}>Manager</option>
+        <option value="receptionist" {% if user.role == 'receptionist' %}selected{% endif %}>Receptionist</option>
+      </select>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Update User</button>
+    <a href="{{ url_for('manage_users') }}" class="btn btn-secondary">Cancel</a>
+  </form>
     </div>
     </div>
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
@@ -162,28 +119,41 @@
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script src="{{ url_for('static', filename='javascript/booking.js') }}"></script>
     <script>
-        document.getElementById('phone_number').addEventListener('blur', function () {
-            const phoneNumber = this.value;
-            if (phoneNumber) {
-                fetch(`/guests/get_by_phone?phone_number=${encodeURIComponent(phoneNumber)}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.exists) {
-                            document.getElementById('first_name').value = data.first_name || '';
-                            document.getElementById('last_name').value = data.last_name || '';
-                            document.getElementById('email').value = data.email || '';
-                            document.getElementById('address').value = data.address || '';
-                            document.getElementById('id_type').value = data.id_type || '';
-                            document.getElementById('id_number').value = data.id_number || '';
-                        } else {
-                            alert('No guest found with this phone number.');
-                        }
-                    })
-                    .catch(error => console.error('Error fetching guest details:', error));
-            }
+        document.addEventListener('DOMContentLoaded', function () {
+            const checkOutDateInput = document.getElementById('check_out_date');
+            const roomSelect = document.getElementById('room_id');
+            const checkInDateInput = document.getElementById('check_in_date');
+    
+            checkOutDateInput.addEventListener('change', function () {
+                const roomId = roomSelect.value;
+                const checkInDate = checkInDateInput.value;
+                const checkOutDate = checkOutDateInput.value;
+    
+                if (roomId && checkInDate && checkOutDate) {
+                    // Make an API call to check for conflicts
+                    fetch(`/bookings/check_conflict?room_id=${roomId}&check_in_date=${checkInDate}&check_out_date=${checkOutDate}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.conflict) {
+                                alert(data.message); // Alert the user about the conflict
+                                checkOutDateInput.value = ''; // Reset the checkout date
+                            }
+                        })
+                        .catch(error => console.error('Error checking conflict:', error));
+                }
+            });
         });
     </script>
     <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const today = new Date().toISOString().split('T')[0];
+            
+            // Set the minimum date for check-in and check-out fields
+            document.getElementById('check_in_date').setAttribute('min', today);
+            document.getElementById('check_out_date').setAttribute('min', today);
+        });
+    </script>
+    <!-- <script>
         document.getElementById('check_in_date').addEventListener('change', filterRooms);
         document.getElementById('check_out_date').addEventListener('change', filterRooms);
     
@@ -215,16 +185,7 @@
                     .catch(error => console.error('Error fetching available rooms:', error));
             }
         }
-    </script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const today = new Date().toISOString().split('T')[0];
-            
-            // Set the minimum date for check-in and check-out fields
-            document.getElementById('check_in_date').setAttribute('min', today);
-            document.getElementById('check_out_date').setAttribute('min', today);
-        });
-    </script>
-
+    </script> -->
+    
 </body>
 </html>

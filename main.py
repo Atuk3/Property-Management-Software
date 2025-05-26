@@ -19,6 +19,7 @@ from flask import redirect, url_for, flash
 from flask import request, render_template, make_response
 
 
+
 # from flask import Flask
 # from flask_mail import Mail, Message
 
@@ -165,6 +166,16 @@ class Guest(db.Model):
 
     # Relationship to Booking
     bookings = db.relationship('Booking', backref='guest', lazy=True)
+
+
+class UserLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
+    action = db.Column(db.String(100), nullable=False)  # e.g. 'login', 'create_booking', 'delete_booking'
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    ip_address = db.Column(db.String(45))  # Store IP address if desired
+
+    user = db.relationship('User', backref='logs')
 #----------------------------------------------------------------
 # FORM CREATION
 class RegistrationForm(FlaskForm):
@@ -279,6 +290,17 @@ def role_required(allowed_roles):
             return redirect(url_for('dashboard'))  # Redirect to a safe page
         return wrapper
     return decorator
+
+def log_action(action):
+    if not current_user.is_authenticated:
+        return  # Ignore if no logged-in user
+    log = UserLog(
+        user_id=current_user.id,
+        action=action,
+        ip_address=request.remote_addr
+    )
+    db.session.add(log)
+    db.session.commit()
   
 # Define the homepage route
 @app.route('/', methods=['GET', 'POST'])
@@ -303,6 +325,7 @@ def register():
         new_user = User(username=form.username.data, password=hashed_password, role=form.role.data)
         db.session.add(new_user)
         db.session.commit()
+        log_action('new_user')
         return redirect(url_for('login'))
     return render_template('register.html', form=form)
 
@@ -313,6 +336,7 @@ def login():
         user = User.query.filter_by(username=form.username.data).first()
         if user and bcrypt.check_password_hash(user.password, form.password.data):
             login_user(user)
+            log_action('login')
             return redirect(url_for('dashboard'))
        
     return render_template('login.html', form=form)
@@ -482,6 +506,7 @@ def add_reservation():
 
         db.session.add(new_reservation)
         db.session.commit()
+        log_action('new_reservation')
         flash('Reservation successfully created!', 'success')
         return redirect(url_for('manage_reservations'))
 
@@ -601,6 +626,7 @@ def edit_reservation(reservation_id):
         reservation.status = form.status.data
 
         db.session.commit()
+        log_action('edit_reservation')
         flash('Reservation updated successfully!', 'success')
         return redirect(url_for('manage_reservations'))
 
@@ -666,13 +692,16 @@ def delete_reservation(reservation_id):
     # Delete reservation
     db.session.delete(reservation)
     db.session.commit()
+    log_action('delete_reservation')
     flash('Reservation deleted successfully!', 'success')
     return redirect(url_for('manage_reservations'))
 
 @app.route('/logout')
 @login_required
 def logout():
+    log_action('logout')
     logout_user()
+    
     return redirect(url_for('login'))
 
 @app.route('/rooms', methods=['GET', 'POST'])
@@ -706,6 +735,7 @@ def add_room():
         )
         db.session.add(room)
         db.session.commit()
+        log_action('new_room')
         flash('Room added successfully!', 'success')
         return redirect(url_for('manage_rooms'))
     return render_template('add_room.html', form=form)
@@ -721,6 +751,7 @@ def edit_room(room_id):
         room.status = form.status.data
         room.price = form.price.data
         db.session.commit()
+        log_action('edit_room')
         flash('Room updated successfully!', 'success')
         return redirect(url_for('manage_rooms'))
     return render_template('edit_room.html', form=form, room=room)
@@ -731,6 +762,7 @@ def delete_room(room_id):
     room = Room.query.get_or_404(room_id)
     db.session.delete(room)
     db.session.commit()
+    log_action('delete_room')
     flash('Room deleted successfully!', 'success')
     return redirect(url_for('manage_rooms'))
 
@@ -741,6 +773,7 @@ def mark_room_clean(room_id):
     if room.status == 'Dirty':
         room.status = 'Available'
         db.session.commit()
+        log_action('room_clean')
         flash(f'Room {room.room_number} is now available.', 'success')
         
     return redirect(url_for('housekeeping'))
@@ -766,6 +799,7 @@ def edit_room_status(room_id):
         room.status = 'Dirty'
 
     db.session.commit()
+    log_action('edit_roomstatus')
     flash(f"Room status updated to {room.status}!", 'success')
     return redirect(url_for('housekeeping'))
 
@@ -861,6 +895,7 @@ def add_booking():
 
         db.session.add(new_booking)
         db.session.commit()
+        log_action('new_booking')
         flash('Booking added successfully!', 'success')
         return redirect(url_for('manage_bookings'))
 
@@ -978,6 +1013,7 @@ def edit_booking(booking_id):
         booking.total_amount = total_amount
 
         db.session.commit()
+        log_action('edit_booking')
         flash('Booking updated successfully!', 'success')
         return redirect(url_for('manage_bookings'))
     
@@ -1061,6 +1097,7 @@ def edit_booking_room(booking_id):
         booking.total_amount = form.calculate_total_price()
 
         db.session.commit()
+        log_action('edit_bookingroom')
         flash('Booking updated successfully!', 'success')
         return redirect(url_for('manage_bookings'))
     
@@ -1078,6 +1115,7 @@ def delete_booking(booking_id):
     room.status = 'Available'
     db.session.delete(booking)
     db.session.commit()
+    log_action('delete_booking')
     flash('Booking deleted successfully!', 'danger')
     return redirect(url_for('manage_bookings'))
 
@@ -1093,6 +1131,7 @@ def check_in(booking_id):
         db.session.commit()  # Ensure the change is committed
 
     db.session.commit()
+    log_action('booking_checkin')
 
    
     return redirect(url_for('manage_bookings'))
@@ -1111,6 +1150,7 @@ def check_out(booking_id):
         reservation.status = 'Checked Out'
     booking.check_out_date = date.today()  # Automatically set the check-out date
     db.session.commit()
+    log_action('booking_checkout')
     return redirect(url_for('manage_bookings'))
 
 @app.route('/bookinghistory')
@@ -1214,6 +1254,7 @@ def check_in_reservation(reservation_id):
     
         db.session.add(new_booking)
         db.session.commit()
+        log_action('reservation_checkin')
         flash('Guest successfully checked in!', 'success')
         return redirect(url_for('manage_bookings'))
 
@@ -1253,70 +1294,73 @@ from sqlalchemy.orm import joinedload
 @login_required
 def reports():
     try:
-        # Get today's date
         today = datetime.today()
 
-        # Get start_date and end_date from query parameters
-        start_date = request.args.get('start_date', None)
-        end_date = request.args.get('end_date', None)
+        # Get date filters from query params
+        start_date_str = request.args.get('start_date', None)
+        end_date_str = request.args.get('end_date', None)
 
-        # Validate and parse dates
-        if start_date and end_date:
+        # Flag to track if user explicitly filtered
+        user_filtered = False
+
+        # Handle date parsing
+        if start_date_str and end_date_str:
             try:
-                start_date = datetime.strptime(start_date, '%Y-%m-%d').replace(hour=0, minute=0, second=0, microsecond=0)
-                end_date = datetime.strptime(end_date, '%Y-%m-%d').replace(hour=23, minute=59, second=59, microsecond=999999)
-
+                start_date = datetime.strptime(start_date_str, '%Y-%m-%d').replace(hour=0, minute=0, second=0)
+                end_date = datetime.strptime(end_date_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+                
                 if start_date > end_date:
                     flash("Start date cannot be after end date.", "danger")
                     return redirect(url_for('reports'))
+
+                user_filtered = True  # ✅ User clicked filter
+
             except ValueError:
-                flash("Invalid date format. Please use YYYY-MM-DD.", "danger")
+                flash("Invalid date format. Use YYYY-MM-DD.", "danger")
                 return redirect(url_for('reports'))
         else:
-            # Default to the first day of the current month and today
-            start_date = today.replace(day=1)
+            # Default to this month
+            start_date = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             end_date = today.replace(hour=23, minute=59, second=59, microsecond=999999)
 
-        # --- FILTERED INSIGHTS BASED ON DATE RANGE ---
+        # Queries
         reservations = Reservation.query.filter(
             Reservation.check_in_date >= start_date,
             Reservation.check_in_date <= end_date
         ).options(joinedload(Reservation.room)).all()
 
-        # Bookings (Checked-In) within the selected date range
         bookings = Booking.query.filter(
-            Booking.check_in_date <= end_date,  # Check-in should be before or on the end date
-            Booking.check_out_date >= start_date,  # Check-out should be after or on the start date
+            Booking.check_in_date <= end_date,
+            Booking.check_out_date >= start_date,
             Booking.status == 'Checked In'
         ).options(joinedload(Booking.room)).all()
 
-        # Total revenue within the selected date range
         total_revenue = db.session.query(func.sum(Booking.total_amount)).filter(
             Booking.check_in_date <= end_date,
             Booking.check_out_date >= start_date,
             Booking.status == 'Checked In'
         ).scalar() or 0
 
-        # Guests arriving within the selected date range
         guests_arriving = Reservation.query.filter(
             Reservation.check_in_date >= start_date,
             Reservation.check_in_date <= end_date,
             Reservation.status == 'Reserved'
         ).options(joinedload(Reservation.room)).all()
 
-        # Guests departing within the selected date range
         guests_departing = Booking.query.filter(
             Booking.check_out_date >= start_date,
             Booking.check_out_date <= end_date,
             Booking.status == 'Checked In'
         ).options(joinedload(Booking.room)).all()
 
-        # Room occupancy rate (current status of rooms)
         total_rooms = Room.query.count()
         occupied_rooms = Room.query.filter_by(status='Occupied').count()
-        occupancy_rate = (occupied_rooms / total_rooms * 100) if total_rooms > 0 else 0
+        occupancy_rate = (occupied_rooms / total_rooms * 100) if total_rooms else 0
 
-        # Render the filtered report data to the reports.html page
+        # ✅ Log only if user filtered
+        if user_filtered:
+            log_action('filter_report')
+
         return render_template(
             'reports.html',
             reservations=reservations,
@@ -1333,6 +1377,7 @@ def reports():
         app.logger.error(f"Error generating report: {e}")
         flash("An error occurred while generating the report. Please try again.", "danger")
         return redirect(url_for('reports'))
+
 
 import csv
 from io import StringIO
@@ -1459,7 +1504,8 @@ def export_csv():
         writer.writerow(['Total Revenue', f"{total_revenue}"])
         writer.writerow(['Total Adults', total_adults])
         writer.writerow(['Total Children', total_children])
-
+        
+        log_action('export_report')
         # Return CSV response
         output.seek(0)
         return Response(
@@ -1469,12 +1515,147 @@ def export_csv():
                 "Content-Disposition": f"attachment; filename=PlanetG Hotel Report_{start_date_str}_to_{end_date_str}.csv"
             }
         )
+    
 
     except Exception as e:
         app.logger.error(f"Error exporting CSV: {e}")
         print(f"Error exporting CSV: {e}")  # Print to console for dev debugging
         flash("An error occurred while exporting the report.", "danger")
         return redirect(url_for('reports'))
+    
+
+@app.route('/user_logs')
+@login_required
+def user_logs():
+    
+     # Get filter inputs
+    username = request.args.get('username')
+    action = request.args.get('action')
+    start_date_str = request.args.get('start_date')
+    end_date_str = request.args.get('end_date')
+
+    # Base query
+    query = UserLog.query.join(User).order_by(UserLog.timestamp.desc())
+
+    # Apply filters dynamically
+    if username:
+        query = query.filter(User.username.ilike(f'%{username}%'))
+
+    if action:
+        query = query.filter(UserLog.action.ilike(f'%{action}%'))
+
+    if start_date_str:
+        try:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+            query = query.filter(UserLog.timestamp >= start_date)
+        except ValueError:
+            flash("Invalid start date format. Use YYYY-MM-DD.", "danger")
+
+    if end_date_str:
+        try:
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
+            query = query.filter(UserLog.timestamp <= end_date)
+        except ValueError:
+            flash("Invalid end date format. Use YYYY-MM-DD.", "danger")
+
+    logs = query.all()
+
+    return render_template('user_logs.html', logs=logs)
+
+# from flask import request, redirect, url_for, flash
+# from flask_login import current_user, logout_user
+
+# # Replace with your actual hotel network IP(s)
+# ALLOWED_HOTEL_IPS = ['197.210.24.52']
+
+# # Path to store the rejected log (adjust if needed)
+# DENIED_LOG_PATH = 'denied_ips.log'
+
+# def log_denied_access(user, ip):
+#     """
+#     Logs denied access attempts to a file with timestamp, username, role, and IP address.
+#     """
+#     log_entry = f"{datetime.datetime.now()} - DENIED: User: {user.username}, Role: {user.role}, IP: {ip}\n"
+    
+#     # Make sure the log file exists, then append
+#     with open(DENIED_LOG_PATH, 'a') as log_file:
+#         log_file.write(log_entry)
+
+
+# @app.before_request
+# def restrict_ip_after_login():
+#     # Allow access to login page and static files
+#     if request.endpoint in ['login', 'static']:
+#         return
+
+#     if current_user.is_authenticated:
+#         user_ip = request.remote_addr
+#         role = current_user.role  # e.g. 'receptionist', 'manager', 'admin'
+
+#         # Restrict certain roles to hotel IP only
+#         if role in ['receptionist', 'manager']:
+#             if user_ip not in ALLOWED_HOTEL_IPS:
+#                 logout_user()  # Log them out immediately
+#                 flash("Access restricted to hotel network for your role.", "danger")
+#                 return redirect(url_for('login'))
+            
+
+from flask import abort
+
+# Edit User
+@app.route('/users/edit/<int:user_id>', methods=['GET', 'POST'])
+@login_required
+def edit_user(user_id):
+    if current_user.role != 'admin':
+        abort(403)  # Forbidden
+
+    user = User.query.get_or_404(user_id)
+
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        role = request.form['role']
+
+        user.username = username
+        user.role = role
+
+        if password.strip():  # Only update password if field is not empty
+            user.password = bcrypt.generate_password_hash(password).decode('utf-8')
+        
+        db.session.commit()
+        log_action('edit_user')
+        flash('User updated successfully!', 'success')
+        return redirect(url_for('manage_users'))
+
+    return render_template('edit_user.html', user=user)
+
+# Delete User
+@app.route('/users/delete/<int:user_id>', methods=['POST'])
+@login_required
+def delete_user(user_id):
+    if current_user.role != 'admin':
+        abort(403)
+
+    user = User.query.get_or_404(user_id)
+
+    if user.id == current_user.id:
+        flash("You cannot delete your own account while logged in.", "danger")
+        return redirect(url_for('manage_users'))
+    
+    log_action('delete_user')
+    db.session.delete(user)
+    db.session.commit()
+    flash('User deleted successfully!', 'success')
+    return redirect(url_for('manage_users'))
+
+@app.route('/users/manage')
+@login_required
+def manage_users():
+    if current_user.role != 'admin':
+        abort(403)
+
+    users = User.query.all()
+    return render_template('manage_users.html', users=users)
 
 if __name__ == '__main__':
     with app.app_context():

@@ -30,7 +30,7 @@
     
     </div>
 
-    <!-- Navigation Links -->
+      <!-- Navigation Links -->
     <nav class="nav flex-column">
         <a class="nav-link text-white py-2" href="/dashboard">
             <i class="fas fa-tachometer-alt mr-2"></i>Dashboard
@@ -41,20 +41,33 @@
         <a class="nav-link text-white py-2" href="/bookings">
             <i class="fas fa-sign-in-alt mr-2"></i>Check In
         </a>
+        {% if current_user.role in ['admin'] %}
         <a class="nav-link text-white py-2" href="/rooms">
             <i class="fas fa-door-closed mr-2"></i>Manage Rooms
         </a>
+        {% endif %}
         <a class="nav-link text-white py-2" href="/housekeeping">
             <i class="fas fa-broom mr-2"></i>Housekeeping
         </a>
         <a class="nav-link text-white py-2" href="/guests">
             <i class="fas fa-users mr-2"></i>Guests
         </a>
-        {% if current_user.role in ['admin'] %}
-        <a class="nav-link text-white py-2" href="/reports">
-            <i class="fas fa-chart-bar mr-2"></i>Reports
+          {% if current_user.role in ['admin'] %}
+    <a class="nav-link text-white py-2" href="/user_logs">
+        <i class="fas fa-chart-bar mr-2"></i>Logs
+    </a>
+   {% endif %}
+         {% if current_user.role in ['admin'] %}
+        <a class="nav-link text-white py-2" href="/users/manage">
+            <i class="fas fa-history mr-2"></i>Manage Staffs
         </a>
         {% endif %}
+        {% if current_user.role in ['admin'] %}
+    <a class="nav-link text-white py-2" href="/reports">
+        <i class="fas fa-chart-bar mr-2"></i>Reports
+    </a>
+    {% endif %}
+    
         <a class="nav-link text-white py-2" href="/logout">
             <i class="fas fa-sign-out-alt mr-2"></i>Logout
         </a>
