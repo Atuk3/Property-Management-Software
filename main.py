@@ -62,7 +62,7 @@ class Reservation(db.Model):
     first_name = db.Column(db.String(100), nullable=False)
     last_name = db.Column(db.String(100), nullable=False)
     phone_number = db.Column(db.String(20), nullable=False)
-    email = db.Column(db.String(120), nullable=False)
+    email = db.Column(db.String(120), nullable=True)
     check_in_date = db.Column(db.Date, nullable=False)
     check_out_date = db.Column(db.Date, nullable=False)
     room_id = db.Column(db.Integer, db.ForeignKey('room.id'), nullable=False)
@@ -110,7 +110,7 @@ class Booking(db.Model):
     first_name = db.Column(db.String(100), nullable=False)
     last_name = db.Column(db.String(100), nullable=False)
     phone_number = db.Column(db.String(20), nullable=False)
-    email = db.Column(db.String(120), nullable=False)
+    email = db.Column(db.String(120), nullable=True)
     address = db.Column(db.String(200), nullable=False)
     id_type = db.Column(db.String(50), nullable=True)
     id_number = db.Column(db.String(50), nullable=True)
@@ -207,7 +207,7 @@ class ReservationForm(FlaskForm):
     check_out_date = DateField('Check-out Date', format='%Y-%m-%d', validators=[DataRequired()])
     room_id = SelectField('Room', coerce=int, validators=[DataRequired()])
     phone_number = IntegerField('Phone Number', validators=[DataRequired()])
-    email = EmailField('Email', validators=[DataRequired()])
+    email = EmailField('Email', validators=[Optional()])
     status = SelectField('Status', choices=[('Reserved', 'Reserved')], validators=[DataRequired()])
     total_amount = DecimalField('Total Amount (₦)', places=2, render_kw={'readonly': True})  # Remove validator
     submit = SubmitField('Save Reservation')
@@ -238,7 +238,7 @@ class BookingForm(FlaskForm):
     last_name = StringField('Last Name', validators=[DataRequired()])
     room_id = SelectField('Room', coerce=int, validators=[DataRequired()])
     phone_number = StringField('Phone Number', validators=[DataRequired(), Length(min=11)])
-    email = EmailField('Email', validators=[DataRequired()])
+    email = EmailField('Email', validators=[Optional()])
     address = StringField('Address', validators=[DataRequired()])
     id_type = SelectField('ID Type', choices=[('NIN', 'NIN'), ('DRIVERS LICENSE', 'Driver\'s License'), ('ID CARD', 'ID Card')], validators=[Optional()])
     id_number = IntegerField('ID Number', validators=[Optional()])
@@ -342,6 +342,7 @@ def login():
     return render_template('login.html', form=form)
 
 from datetime import date
+
 @app.route('/dashboard')
 @login_required
 def dashboard():
@@ -351,7 +352,7 @@ def dashboard():
 
     # Fetch all reservations and dynamically update room statuses
     reservations = Reservation.query.all()
-    
+
 
     # Fetch all bookings with status 'Checked In'
     total_bookings = Booking.query.filter_by(status='Checked In').all()
@@ -384,26 +385,13 @@ def dashboard():
     guests_departing_today = Booking.query.filter_by(check_out_date=today, status='Checked In').all()
 
     # Fetch total revenue for today
-    active_bookings = Booking.query.filter(
-        Booking.check_in_date <= today,
-        Booking.check_out_date >= today
+    bookings_checked_in_today = Booking.query.filter(
+        Booking.check_in_date == today,
+        Booking.status.in_(['Checked In', 'Checked Out'])
     ).all()
 
-    total_revenue_today = 0
-    for booking in active_bookings:
-        # Calculate the number of nights
-        number_of_nights = (booking.check_out_date - booking.check_in_date).days
+    total_revenue_today = sum([b.total_amount for b in bookings_checked_in_today])
 
-        # If guest is checking out today, count the full amount
-        if booking.check_out_date == today:
-            total_revenue_today += booking.total_amount
-        elif number_of_nights > 0:  # Avoid division by zero
-            daily_rate = booking.total_amount / number_of_nights
-            total_revenue_today += daily_rate
-        else:
-            # Handle the case where number_of_nights is 0
-            daily_rate = booking.total_amount  # Maybe assign the full amount if it's a single day stay
-            total_revenue_today += daily_rate
 
     # Fetch recent bookings (last 5)
     recent_bookings = Booking.query.order_by(Booking.check_in_date.desc()).limit(5).all()
@@ -421,7 +409,6 @@ def dashboard():
         guests_departing_today=guests_departing_today,
         available_rooms=available_rooms  # Pass available rooms to template
     )
-
 
 # Route to view all reservations
 @app.route('/reservations', methods=['GET'])
@@ -1123,7 +1110,7 @@ def delete_booking(booking_id):
 def check_in(booking_id):
     booking = Booking.query.get_or_404(booking_id)
     booking.status = 'Checked In'
-    booking.check_in_date = date.today()  # Automatically set the check-in date
+    # booking.check_in_date = date.today()  # Automatically set the check-in date
      # Fetch the room and mark it as "Occupied"
     room = Room.query.get(booking.room_id)
     if room: 
@@ -1289,6 +1276,8 @@ from datetime import datetime
 from sqlalchemy import func
 from flask_login import login_required
 from sqlalchemy.orm import joinedload
+from sqlalchemy import or_
+
 
 @app.route('/reports', methods=['GET'])
 @login_required
@@ -1332,13 +1321,19 @@ def reports():
         bookings = Booking.query.filter(
             Booking.check_in_date <= end_date,
             Booking.check_out_date >= start_date,
-            Booking.status == 'Checked In'
+            or_(
+                Booking.status == 'Checked In',
+                Booking.status == 'Checked Out'
+            )
         ).options(joinedload(Booking.room)).all()
 
         total_revenue = db.session.query(func.sum(Booking.total_amount)).filter(
             Booking.check_in_date <= end_date,
             Booking.check_out_date >= start_date,
-            Booking.status == 'Checked In'
+            or_(
+                Booking.status == 'Checked In',
+                Booking.status == 'Checked Out'
+            )
         ).scalar() or 0
 
         guests_arriving = Reservation.query.filter(
@@ -1398,13 +1393,15 @@ def export_csv():
         start_date = datetime.strptime(start_date_str, '%Y-%m-%d').replace(hour=0, minute=0, second=0)
         end_date = datetime.strptime(end_date_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
 
-        # Query data
         bookings = Booking.query.filter(
             Booking.check_in_date <= end_date,
             Booking.check_out_date >= start_date,
-            Booking.status == 'Checked In'
+            or_(
+                Booking.status == 'Checked In',
+                Booking.status == 'Checked Out'
+            )
         ).options(joinedload(Booking.room)).all()
-
+        
         reservations = Reservation.query.filter(
             Reservation.check_in_date >= start_date,
             Reservation.check_in_date <= end_date
@@ -1566,16 +1563,25 @@ def user_logs():
 # from flask_login import current_user, logout_user
 
 # # Replace with your actual hotel network IP(s)
-# ALLOWED_HOTEL_IPS = ['197.210.24.52']
+# ALLOWED_HOTEL_IPS = ['127.0.0.1']
 
 # # Path to store the rejected log (adjust if needed)
 # DENIED_LOG_PATH = 'denied_ips.log'
+
+# def get_real_ip():
+#     """
+#     Returns the real IP address of the client, even if behind a proxy.
+#     """
+#     forwarded_for = request.headers.get('X-Forwarded-For')
+#     if forwarded_for:
+#         return forwarded_for.split(',')[0].strip()
+#     return request.remote_addr
 
 # def log_denied_access(user, ip):
 #     """
 #     Logs denied access attempts to a file with timestamp, username, role, and IP address.
 #     """
-#     log_entry = f"{datetime.datetime.now()} - DENIED: User: {user.username}, Role: {user.role}, IP: {ip}\n"
+#     log_entry = f"{datetime.now()} - DENIED: User: {user.username}, Role: {user.role}, IP: {ip}\n"
     
 #     # Make sure the log file exists, then append
 #     with open(DENIED_LOG_PATH, 'a') as log_file:
@@ -1595,6 +1601,7 @@ def user_logs():
 #         # Restrict certain roles to hotel IP only
 #         if role in ['receptionist', 'manager']:
 #             if user_ip not in ALLOWED_HOTEL_IPS:
+#                 log_denied_access(current_user, user_ip)
 #                 logout_user()  # Log them out immediately
 #                 flash("Access restricted to hotel network for your role.", "danger")
 #                 return redirect(url_for('login'))
@@ -1641,7 +1648,7 @@ def delete_user(user_id):
     if user.id == current_user.id:
         flash("You cannot delete your own account while logged in.", "danger")
         return redirect(url_for('manage_users'))
-    
+        
     log_action('delete_user')
     db.session.delete(user)
     db.session.commit()
